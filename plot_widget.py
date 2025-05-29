@@ -63,7 +63,22 @@ class PriorityPlotWidget(QWidget):
             ("Review Code Changes", 3.0, 2.0),
             ("Team Meeting", 2.5, 1.5),
             ("Update Documentation", 3.5, 4.0),
-            ("Bug Fixing", 4.0, 2.5)
+            ("Bug Fixing", 4.0, 2.5),
+            ("Client Presentation", 5.0, 4.0),
+            ("Code Refactoring", 3.5, 5.0),
+            ("Unit Testing", 4.0, 3.0),
+            ("Performance Optimization", 4.5, 6.0),
+            ("Security Audit", 5.0, 4.5),
+            ("Database Migration", 4.0, 7.0),
+            ("API Integration", 3.5, 3.5),
+            ("User Training", 3.0, 2.0),
+            ("System Backup", 2.5, 1.0),
+            ("Deployment Planning", 4.0, 2.0),
+            ("Code Review", 3.5, 1.5),
+            ("Feature Implementation", 4.5, 5.0),
+            ("Technical Documentation", 3.0, 4.0),
+            ("Bug Triage", 3.5, 2.0),
+            ("System Monitoring", 2.5, 1.5)
         ]
         
         for task_name, value, time in test_goals:
