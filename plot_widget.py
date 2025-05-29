@@ -2,10 +2,12 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QTabWidget, QTabl
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QClipboard
 from model import Task, calculate_and_sort_tasks
 import numpy as np
 from openpyxl import Workbook
 from datetime import datetime
+from PyQt6.QtWidgets import QApplication
 
 class PriorityPlotWidget(QWidget):
     def __init__(self, task_list=None):
@@ -42,6 +44,11 @@ class PriorityPlotWidget(QWidget):
         self.add_button = QPushButton("Add Goal")
         self.add_button.clicked.connect(self.add_task)
         form_layout.addWidget(self.add_button)
+        
+        # Add clipboard import button
+        self.clipboard_button = QPushButton("Add Goals from Clipboard")
+        self.clipboard_button.clicked.connect(self.add_goals_from_clipboard)
+        form_layout.addWidget(self.clipboard_button)
         
         # Add test goals button
         self.test_button = QPushButton("Add Test Goals")
@@ -97,6 +104,26 @@ class PriorityPlotWidget(QWidget):
         self.task_list.append(Task(task, 3.0, 4.0))  # Default to middle of our ranges
         self.task_input.clear()
         self.refresh_input_table()
+
+    def add_goals_from_clipboard(self):
+        clipboard = QApplication.clipboard()
+        text = clipboard.text().strip()
+        
+        if not text:
+            QMessageBox.warning(self, "Clipboard Empty", "No text found in clipboard.")
+            return
+            
+        goals = [goal.strip() for goal in text.split('\n') if goal.strip()]
+        
+        if not goals:
+            QMessageBox.warning(self, "No Valid Goals", "No valid goals found in clipboard text.")
+            return
+            
+        for goal in goals:
+            self.task_list.append(Task(goal, 3.0, 4.0))  # Default to middle of our ranges
+            
+        self.refresh_input_table()
+        QMessageBox.information(self, "Success", f"Added {len(goals)} goals from clipboard.")
 
     def refresh_input_table(self):
         self.input_table.setRowCount(len(self.task_list))
