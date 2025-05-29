@@ -1,9 +1,11 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QLineEdit, QLabel, QHBoxLayout, QMessageBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QLineEdit, QLabel, QHBoxLayout, QMessageBox, QFileDialog
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from model import Task, calculate_and_sort_tasks
 import numpy as np
+from openpyxl import Workbook
+from datetime import datetime
 
 class PriorityPlotWidget(QWidget):
     def __init__(self, task_list=None):
@@ -201,15 +203,75 @@ class PriorityPlotWidget(QWidget):
         layout = QVBoxLayout()
         self.table = QTableWidget()
         layout.addWidget(self.table)
+        
+        # Add export button
+        self.export_button = QPushButton('Export to Excel')
+        self.export_button.clicked.connect(self.export_to_excel)
+        layout.addWidget(self.export_button)
+        
         self.table_tab.setLayout(layout)
+
+    def export_to_excel(self):
+        if not self.task_list:
+            QMessageBox.warning(self, "No Data", "There are no tasks to export.")
+            return
+            
+        # Get save file path
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Excel File",
+            f"priority_plot_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            "Excel Files (*.xlsx)"
+        )
+        
+        if not file_path:
+            return
+            
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Task Priorities"
+            
+            # Add headers
+            headers = ['Task', 'Value', 'Time (hours)', 'Priority Score']
+            for col, header in enumerate(headers, 1):
+                ws.cell(row=1, column=col, value=header)
+            
+            # Add data
+            sorted_tasks = calculate_and_sort_tasks(self.task_list)
+            for row, task in enumerate(sorted_tasks, 2):
+                ws.cell(row=row, column=1, value=task.task)
+                ws.cell(row=row, column=2, value=task.value)
+                ws.cell(row=row, column=3, value=task.time)
+                ws.cell(row=row, column=4, value=task.score)
+            
+            # Auto-adjust column widths
+            for column in ws.columns:
+                max_length = 0
+                column = [cell for cell in column]
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2)
+                ws.column_dimensions[column[0].column_letter].width = adjusted_width
+            
+            wb.save(file_path)
+            QMessageBox.information(self, "Success", "Data exported successfully!")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", f"Failed to export data: {str(e)}")
 
     def showTable(self):
         sorted_tasks = calculate_and_sort_tasks(self.task_list)
         self.table.setRowCount(len(sorted_tasks))
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(['Task', 'Value', 'Time'])
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(['Task', 'Value', 'Time', 'Priority Score'])
         for i, t in enumerate(sorted_tasks):
             self.table.setItem(i, 0, QTableWidgetItem(t.task))
             self.table.setItem(i, 1, QTableWidgetItem(f"{t.value:.2f}"))
             self.table.setItem(i, 2, QTableWidgetItem(f"{t.time:.2f}"))
+            self.table.setItem(i, 3, QTableWidgetItem(f"{t.score:.2f}"))
         self.tabs.setCurrentWidget(self.table_tab) 
