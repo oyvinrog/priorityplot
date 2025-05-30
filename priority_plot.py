@@ -1,1 +1,0 @@
-# This file has been refactored. See model.py, plot_widget.py, and main.py for the new structure. 
