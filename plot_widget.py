@@ -151,8 +151,8 @@ class PriorityPlotWidget(QWidget):
         self.ax.set_title('Task Priority Plot')
         
         # Set fixed axis limits
-        self.ax.set_xlim(1, 6)
-        self.ax.set_ylim(1, 8)
+        self.ax.set_xlim(0, 6)
+        self.ax.set_ylim(0, 8)
         
         # Connect mouse events
         self.canvas.mpl_connect('button_press_event', self.on_press)
@@ -248,8 +248,8 @@ class PriorityPlotWidget(QWidget):
         self.ax.set_title('Task Priority Plot')
         
         # Maintain fixed axis limits
-        self.ax.set_xlim(1, 6)
-        self.ax.set_ylim(1, 8)
+        self.ax.set_xlim(0, 6)
+        self.ax.set_ylim(0, 8)
         
         # Create arrays for all points
         x_data = [t.value for t in self.task_list]
