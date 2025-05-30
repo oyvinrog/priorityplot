@@ -15,6 +15,7 @@ class PriorityPlotWidget(QWidget):
         self.task_list = task_list if task_list is not None else []
         self.dragging = False
         self.drag_index = None
+        self.moved_points = set()  # Track which points have been moved
         self.initUI()
 
     def initUI(self):
@@ -184,6 +185,7 @@ class PriorityPlotWidget(QWidget):
         # Update task values
         self.task_list[self.drag_index].value = event.xdata
         self.task_list[self.drag_index].time = event.ydata
+        self.moved_points.add(self.drag_index)  # Mark this point as moved
         
         # Update scatter plot data directly for smooth movement
         x_data = [t.value for t in self.task_list]
@@ -214,11 +216,15 @@ class PriorityPlotWidget(QWidget):
         self.ax.set_xlim(1, 6)
         self.ax.set_ylim(1, 8)
         
-        self.scatter = self.ax.scatter(
-            [t.value for t in self.task_list],
-            [t.time for t in self.task_list],
-            picker=True
-        )
+        # Create arrays for all points
+        x_data = [t.value for t in self.task_list]
+        y_data = [t.time for t in self.task_list]
+        
+        # Create color array based on whether points have been moved
+        colors = ['blue' if i in self.moved_points else 'red' for i in range(len(self.task_list))]
+        
+        # Create single scatter plot with different colors
+        self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True)
         
         # Add task labels
         for i, t in enumerate(self.task_list):
