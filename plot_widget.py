@@ -255,13 +255,33 @@ class PriorityPlotWidget(QWidget):
         x_data = [t.value for t in self.task_list]
         y_data = [t.time for t in self.task_list]
         
+        # Calculate scores and find the best task
+        for task in self.task_list:
+            task.calculate_score()
+        best_task_index = max(range(len(self.task_list)), key=lambda i: self.task_list[i].score)
+        
         # Create color array based on whether points have been moved
         colors = ['blue' if i in self.moved_points else 'red' for i in range(len(self.task_list))]
         
-        # Create single scatter plot with different colors
-        self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True)
+        # Create scatter plot for all points except the best one
+        non_best_indices = [i for i in range(len(self.task_list)) if i != best_task_index]
+        if non_best_indices:
+            self.ax.scatter(
+                [x_data[i] for i in non_best_indices],
+                [y_data[i] for i in non_best_indices],
+                c=[colors[i] for i in non_best_indices],
+                picker=True
+            )
         
-        # Remove task labels - they will be shown on hover instead
+        # Plot the best task with a circled "1"
+        best_x = x_data[best_task_index]
+        best_y = y_data[best_task_index]
+        self.ax.plot(best_x, best_y, 'o', markersize=15, markerfacecolor='none', markeredgecolor=colors[best_task_index])
+        self.ax.text(best_x, best_y, '1', ha='center', va='center', fontsize=12, fontweight='bold')
+        
+        # Update the scatter reference for event handling
+        self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True, alpha=0)  # Invisible scatter for event handling
+        
         self.canvas.draw()
 
     def initTableTab(self):
