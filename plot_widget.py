@@ -143,12 +143,25 @@ class PriorityPlotWidget(QWidget):
 
     def initPlotTab(self):
         layout = QVBoxLayout()
-        self.figure = Figure(figsize=(5, 4))
+        self.figure = Figure(figsize=(5, 4), facecolor='#353535')
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
-        self.ax.set_xlabel('Value')
-        self.ax.set_ylabel('Time (hours)')
-        self.ax.set_title('Task Priority Plot')
+        
+        # Set modern plot style
+        self.ax.set_facecolor('#353535')
+        self.ax.grid(True, linestyle='--', alpha=0.3, color='#555555')
+        self.ax.spines['bottom'].set_color('#555555')
+        self.ax.spines['top'].set_color('#555555')
+        self.ax.spines['left'].set_color('#555555')
+        self.ax.spines['right'].set_color('#555555')
+        
+        # Set labels with modern styling
+        self.ax.set_xlabel('Value', color='white', fontsize=10, fontweight='bold')
+        self.ax.set_ylabel('Time (hours)', color='white', fontsize=10, fontweight='bold')
+        self.ax.set_title('Task Priority Plot', color='white', fontsize=12, fontweight='bold', pad=20)
+        
+        # Style the ticks
+        self.ax.tick_params(colors='white', which='both')
         
         # Set fixed axis limits
         self.ax.set_xlim(0, 6)
@@ -158,14 +171,19 @@ class PriorityPlotWidget(QWidget):
         self.canvas.mpl_connect('button_press_event', self.on_press)
         self.canvas.mpl_connect('button_release_event', self.on_release)
         self.canvas.mpl_connect('motion_notify_event', self.on_motion)
-        self.canvas.mpl_connect('motion_notify_event', self.on_hover)  # Add hover event
+        self.canvas.mpl_connect('motion_notify_event', self.on_hover)
         
         self.scatter = self.ax.scatter(
             [t.value for t in self.task_list],
             [t.time for t in self.task_list],
-            picker=True
+            picker=True,
+            alpha=0.7
         )
+        
+        # Adjust figure layout
+        self.figure.tight_layout()
         self.canvas.draw()
+        
         layout.addWidget(self.canvas)
         self.apply_button = QPushButton('Apply')
         self.apply_button.clicked.connect(self.showTable)
@@ -232,8 +250,21 @@ class PriorityPlotWidget(QWidget):
                 xy=(task.value, task.time),
                 xytext=(10, 10),
                 textcoords='offset points',
-                bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
-                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0')
+                bbox=dict(
+                    boxstyle='round,pad=0.5',
+                    fc='#2a82da',
+                    ec='#555555',
+                    alpha=0.9
+                ),
+                color='white',
+                fontsize=9,
+                fontweight='bold',
+                arrowprops=dict(
+                    arrowstyle='->',
+                    connectionstyle='arc3,rad=0.2',
+                    color='#555555',
+                    linewidth=1.5
+                )
             )
             self.canvas.draw_idle()
         elif self.current_annotation:
@@ -243,9 +274,22 @@ class PriorityPlotWidget(QWidget):
 
     def update_plot(self):
         self.ax.clear()
-        self.ax.set_xlabel('Value')
-        self.ax.set_ylabel('Time (hours)')
-        self.ax.set_title('Task Priority Plot')
+        
+        # Reapply modern styling
+        self.ax.set_facecolor('#353535')
+        self.ax.grid(True, linestyle='--', alpha=0.3, color='#555555')
+        self.ax.spines['bottom'].set_color('#555555')
+        self.ax.spines['top'].set_color('#555555')
+        self.ax.spines['left'].set_color('#555555')
+        self.ax.spines['right'].set_color('#555555')
+        
+        # Set labels with modern styling
+        self.ax.set_xlabel('Value', color='white', fontsize=10, fontweight='bold')
+        self.ax.set_ylabel('Time (hours)', color='white', fontsize=10, fontweight='bold')
+        self.ax.set_title('Task Priority Plot', color='white', fontsize=12, fontweight='bold', pad=20)
+        
+        # Style the ticks
+        self.ax.tick_params(colors='white', which='both')
         
         # Maintain fixed axis limits
         self.ax.set_xlim(0, 6)
@@ -261,7 +305,7 @@ class PriorityPlotWidget(QWidget):
         best_task_index = max(range(len(self.task_list)), key=lambda i: self.task_list[i].score)
         
         # Create color array based on whether points have been moved
-        colors = ['blue' if i in self.moved_points else 'red' for i in range(len(self.task_list))]
+        colors = ['#2a82da' if i in self.moved_points else '#e74c3c' for i in range(len(self.task_list))]
         
         # Create scatter plot for all points except the best one
         non_best_indices = [i for i in range(len(self.task_list)) if i != best_task_index]
@@ -270,18 +314,24 @@ class PriorityPlotWidget(QWidget):
                 [x_data[i] for i in non_best_indices],
                 [y_data[i] for i in non_best_indices],
                 c=[colors[i] for i in non_best_indices],
-                picker=True
+                picker=True,
+                alpha=0.7,
+                s=100
             )
         
         # Plot the best task with a circled "1"
         best_x = x_data[best_task_index]
         best_y = y_data[best_task_index]
-        self.ax.plot(best_x, best_y, 'o', markersize=15, markerfacecolor='none', markeredgecolor=colors[best_task_index])
-        self.ax.text(best_x, best_y, '1', ha='center', va='center', fontsize=12, fontweight='bold')
+        self.ax.plot(best_x, best_y, 'o', markersize=20, markerfacecolor='none', 
+                    markeredgecolor=colors[best_task_index], markeredgewidth=2)
+        self.ax.text(best_x, best_y, '1', ha='center', va='center', 
+                    fontsize=14, fontweight='bold', color=colors[best_task_index])
         
         # Update the scatter reference for event handling
-        self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True, alpha=0)  # Invisible scatter for event handling
+        self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True, alpha=0)
         
+        # Adjust figure layout
+        self.figure.tight_layout()
         self.canvas.draw()
 
     def initTableTab(self):
