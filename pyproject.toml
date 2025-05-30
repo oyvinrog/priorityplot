@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "priorityplot"
+version = "0.1.0"
+description = "A priority plotting application with PyQt6"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "PyQt6",
+    "matplotlib",
+    "numpy",
+    "openpyxl"
+]
+
+[project.scripts]
+priorityplot = "priorityplot.main:main" 
