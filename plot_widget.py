@@ -16,6 +16,7 @@ class PriorityPlotWidget(QWidget):
         self.dragging = False
         self.drag_index = None
         self.moved_points = set()  # Track which points have been moved
+        self.current_annotation = None  # Track current hover annotation
         self.initUI()
 
     def initUI(self):
@@ -157,6 +158,7 @@ class PriorityPlotWidget(QWidget):
         self.canvas.mpl_connect('button_press_event', self.on_press)
         self.canvas.mpl_connect('button_release_event', self.on_release)
         self.canvas.mpl_connect('motion_notify_event', self.on_motion)
+        self.canvas.mpl_connect('motion_notify_event', self.on_hover)  # Add hover event
         
         self.scatter = self.ax.scatter(
             [t.value for t in self.task_list],
@@ -206,6 +208,39 @@ class PriorityPlotWidget(QWidget):
         self.dragging = False
         self.drag_index = None
 
+    def on_hover(self, event):
+        if event.inaxes != self.ax:
+            if self.current_annotation:
+                self.current_annotation.set_visible(False)
+                self.current_annotation = None
+                self.canvas.draw_idle()
+            return
+
+        contains, ind = self.scatter.contains(event)
+        if contains:
+            pos = ind["ind"][0]
+            task = self.task_list[pos]
+            
+            # Remove previous annotation if it exists
+            if self.current_annotation:
+                self.current_annotation.set_visible(False)
+            
+            # Create new annotation with task name and values
+            text = f"{task.task}\nValue: {task.value:.1f}\nTime: {task.time:.1f}"
+            self.current_annotation = self.ax.annotate(
+                text,
+                xy=(task.value, task.time),
+                xytext=(10, 10),
+                textcoords='offset points',
+                bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0')
+            )
+            self.canvas.draw_idle()
+        elif self.current_annotation:
+            self.current_annotation.set_visible(False)
+            self.current_annotation = None
+            self.canvas.draw_idle()
+
     def update_plot(self):
         self.ax.clear()
         self.ax.set_xlabel('Value')
@@ -226,10 +261,7 @@ class PriorityPlotWidget(QWidget):
         # Create single scatter plot with different colors
         self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True)
         
-        # Add task labels
-        for i, t in enumerate(self.task_list):
-            self.ax.annotate(t.task, (t.value, t.time), xytext=(5, 5), textcoords='offset points')
-        
+        # Remove task labels - they will be shown on hover instead
         self.canvas.draw()
 
     def initTableTab(self):
