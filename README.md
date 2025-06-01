@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![PriPlot Screenshot](img/priplot.png)
+![PriPlot Screenshot](https://github.com/oyvinrog/priorityplot/raw/main/img/priplot.png)
 
 [![PyPI version](https://badge.fury.io/py/priorityplot.svg)](https://badge.fury.io/py/priorityplot)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -62,7 +62,7 @@ pip install priorityplot
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/priorityplot.git
+git clone https://github.com/oyvinrog/priorityplot.git
 cd priorityplot
 pip install -e .
 ```
@@ -150,7 +150,7 @@ pip install -e .
 ### Setting Up Development Environment
 
 ```bash
-git clone https://github.com/yourusername/priorityplot.git
+git clone https://github.com/oyvinrog/priplot.git
 cd priorityplot
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -192,9 +192,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/yourusername/priorityplot/issues)
-- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/yourusername/priorityplot/discussions)
-- 📧 **Email**: your.email@example.com
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/oyvinrog/priplot/issues)
+- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/oyvinrog/priplot/discussions)
+- 📧 **Email**: oyvinrog@example.com
 
 ---
 
@@ -202,6 +202,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ for better productivity**
 
-[⭐ Star this repo](https://github.com/yourusername/priorityplot) if you find it helpful!
+[⭐ Star this repo](https://github.com/oyvinrog/priplot) if you find it helpful!
 
 </div> 
