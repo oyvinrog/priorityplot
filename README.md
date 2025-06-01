@@ -75,6 +75,21 @@ pip install -e .
 
 ## ⚡ Quick Start
 
+### Option 1: Using the Launcher Script (Recommended)
+
+```bash
+git clone https://github.com/oyvinrog/priorityplot.git
+cd priorityplot
+./run_priplot.sh
+```
+
+The launcher script will automatically:
+- Set up a virtual environment if needed
+- Install all dependencies
+- Launch the application
+
+### Option 2: Manual Installation
+
 1. **Install PriPlot**:
    ```bash
    pip install priorityplot
@@ -84,6 +99,19 @@ pip install -e .
    ```bash
    priorityplot
    ```
+
+### Option 3: From Source
+
+```bash
+git clone https://github.com/oyvinrog/priorityplot.git
+cd priorityplot
+python3 -m venv fresh_venv
+source fresh_venv/bin/activate
+pip install -r requirements.txt
+python -m priorityplot.main
+```
+
+### Getting Started
 
 3. **Add your tasks** in the "Input Goals" tab
 
