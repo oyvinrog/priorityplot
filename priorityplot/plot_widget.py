@@ -3,7 +3,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QClipboard
-from model import Task, calculate_and_sort_tasks
+from .model import Task, calculate_and_sort_tasks
 import numpy as np
 from openpyxl import Workbook
 from datetime import datetime
@@ -41,6 +41,7 @@ class PriorityPlotWidget(QWidget):
         form_layout = QHBoxLayout()
         self.task_input = QLineEdit()
         self.task_input.setPlaceholderText("Task name")
+        self.task_input.returnPressed.connect(self.add_task)
         form_layout.addWidget(QLabel("Task:"))
         form_layout.addWidget(self.task_input)
         self.add_button = QPushButton("Add Goal")

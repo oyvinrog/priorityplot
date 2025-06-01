@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow
 from PyQt6.QtGui import QPalette, QColor
-from plot_widget import PriorityPlotWidget
+from .plot_widget import PriorityPlotWidget
 
 def main():
     app = QApplication(sys.argv)

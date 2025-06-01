@@ -6,3 +6,6 @@ __pycache__/
 *.pyw
 *.pyz
 *.pywz
+.pypirc
+dist/
+build/

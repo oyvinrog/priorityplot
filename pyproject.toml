@@ -4,16 +4,39 @@ build-backend = "hatchling.build"
 
 [project]
 name = "priorityplot"
-version = "0.1.0"
+version = "0.1.1"
 description = "A priority plotting application with PyQt6"
 readme = "README.md"
 requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "cvujll", email = "cvujll@example.com"}
+]
+keywords = ["plotting", "priority", "visualization", "pyqt6", "matplotlib"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "PyQt6",
     "matplotlib",
     "numpy",
     "openpyxl"
 ]
+
+[project.urls]
+Homepage = "https://github.com/cvujll/priorityplot"
+Repository = "https://github.com/cvujll/priorityplot"
+Issues = "https://github.com/cvujll/priorityplot/issues"
 
 [project.scripts]
 priorityplot = "priorityplot.main:main" 
