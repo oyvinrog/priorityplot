@@ -300,33 +300,38 @@ class PriorityPlotWidget(QWidget):
         x_data = [t.value for t in self.task_list]
         y_data = [t.time for t in self.task_list]
         
-        # Calculate scores and find the best task
+        # Calculate scores and find the top 3 tasks
         for task in self.task_list:
             task.calculate_score()
-        best_task_index = max(range(len(self.task_list)), key=lambda i: self.task_list[i].score)
+        
+        # Get indices sorted by score (highest first)
+        sorted_indices = sorted(range(len(self.task_list)), key=lambda i: self.task_list[i].score, reverse=True)
+        top_3_indices = sorted_indices[:3]  # Get top 3 tasks
         
         # Create color array based on whether points have been moved
         colors = ['#2a82da' if i in self.moved_points else '#e74c3c' for i in range(len(self.task_list))]
         
-        # Create scatter plot for all points except the best one
-        non_best_indices = [i for i in range(len(self.task_list)) if i != best_task_index]
-        if non_best_indices:
+        # Create scatter plot for all points except the top 3
+        non_top_indices = [i for i in range(len(self.task_list)) if i not in top_3_indices]
+        if non_top_indices:
             self.ax.scatter(
-                [x_data[i] for i in non_best_indices],
-                [y_data[i] for i in non_best_indices],
-                c=[colors[i] for i in non_best_indices],
+                [x_data[i] for i in non_top_indices],
+                [y_data[i] for i in non_top_indices],
+                c=[colors[i] for i in non_top_indices],
                 picker=True,
                 alpha=0.7,
                 s=100
             )
         
-        # Plot the best task with a circled "1"
-        best_x = x_data[best_task_index]
-        best_y = y_data[best_task_index]
-        self.ax.plot(best_x, best_y, 'o', markersize=20, markerfacecolor='none', 
-                    markeredgecolor=colors[best_task_index], markeredgewidth=2)
-        self.ax.text(best_x, best_y, '1', ha='center', va='center', 
-                    fontsize=14, fontweight='bold', color=colors[best_task_index])
+        # Plot the top 3 tasks with circled numbers
+        for rank, task_index in enumerate(top_3_indices, 1):
+            if task_index < len(self.task_list):  # Safety check
+                task_x = x_data[task_index]
+                task_y = y_data[task_index]
+                self.ax.plot(task_x, task_y, 'o', markersize=20, markerfacecolor='none', 
+                            markeredgecolor=colors[task_index], markeredgewidth=2)
+                self.ax.text(task_x, task_y, str(rank), ha='center', va='center', 
+                            fontsize=14, fontweight='bold', color=colors[task_index])
         
         # Update the scatter reference for event handling
         self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True, alpha=0)
