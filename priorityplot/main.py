@@ -60,11 +60,9 @@ def main():
         }
         QPushButton:hover {
             background-color: #3292ea;
-            transform: translateY(-1px);
         }
         QPushButton:pressed {
             background-color: #1a72ca;
-            transform: translateY(1px);
         }
         QLineEdit {
             padding: 8px 12px;

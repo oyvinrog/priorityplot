@@ -1,8 +1,8 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QLineEdit, QLabel, QHBoxLayout, QMessageBox, QFileDialog
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QLineEdit, QLabel, QHBoxLayout, QMessageBox, QFileDialog, QSplitter, QFrame
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QClipboard
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QClipboard, QColor
 from .model import Task, calculate_and_sort_tasks
 import numpy as np
 from openpyxl import Workbook
@@ -17,6 +17,9 @@ class PriorityPlotWidget(QWidget):
         self.drag_index = None
         self.moved_points = set()  # Track which points have been moved
         self.current_annotation = None  # Track current hover annotation
+        self.auto_update_timer = QTimer()  # Timer for real-time updates
+        self.auto_update_timer.timeout.connect(self.update_priority_display)
+        self.auto_update_timer.setSingleShot(True)
         self.initUI()
         
         # Show welcome message for new users
@@ -25,122 +28,286 @@ class PriorityPlotWidget(QWidget):
 
     def initUI(self):
         layout = QVBoxLayout()
-        self.tabs = QTabWidget()
         
-        # Add icons and tooltips to tabs
-        self.input_tab = QWidget()
-        self.plot_tab = QWidget()
-        self.table_tab = QWidget()
+        # Create main splitter for side-by-side layout when tasks exist
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        self.tabs.addTab(self.input_tab, "📝 Input Goals")
-        self.tabs.addTab(self.plot_tab, "📊 Plot")
-        self.tabs.addTab(self.table_tab, "📋 Table")
+        # Left panel for input (will be hidden after tasks are added)
+        self.input_panel = QWidget()
+        self.input_panel.setMaximumWidth(400)
+        self.input_panel.setMinimumWidth(350)
         
-        # Add tooltips to tabs
-        self.tabs.setTabToolTip(0, "Add and manage your tasks/goals here.\nYou can type them manually, import from clipboard, or use test data.")
-        self.tabs.setTabToolTip(1, "Interactive priority visualization.\nDrag tasks around to adjust their value and time estimates.")
-        self.tabs.setTabToolTip(2, "View prioritized results and export to Excel.\nTasks are automatically ranked by priority score.")
+        # Right panel for plot and results
+        self.plot_panel = QWidget()
         
-        self.tabs.setTabEnabled(1, False)
-        self.tabs.setTabEnabled(2, False)
-        layout.addWidget(self.tabs)
+        self.main_splitter.addWidget(self.input_panel)
+        self.main_splitter.addWidget(self.plot_panel)
+        
+        # Initially show only input panel
+        self.plot_panel.hide()
+        
+        layout.addWidget(self.main_splitter)
         self.setLayout(layout)
-        self.initInputTab()
-        self.initPlotTab()
-        self.initTableTab()
+        
+        self.initInputPanel()
+        self.initPlotPanel()
 
-    def initInputTab(self):
+    def initInputPanel(self):
         layout = QVBoxLayout()
         
-        # Add helpful instruction label with help button
-        instruction_layout = QHBoxLayout()
-        instruction_label = QLabel("🎯 Add your tasks and goals below. Start by typing a task name or use the quick import options.")
-        instruction_label.setStyleSheet("color: #ffffff; font-weight: bold; padding: 10px; margin-bottom: 5px;")
+        # Streamlined header
+        header_label = QLabel("🎯 Add Your Tasks")
+        header_label.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 16px; padding: 15px 10px 10px 10px;")
+        layout.addWidget(header_label)
         
-        help_button = QPushButton("❓ Help")
-        help_button.clicked.connect(self.show_help)
-        help_button.setToolTip("📚 Click for detailed instructions on how to use PriPlot effectively!")
-        help_button.setStyleSheet("""
+        # Quick start options in a more prominent layout
+        quick_start_frame = QFrame()
+        quick_start_frame.setStyleSheet("""
+            QFrame {
+                background-color: #404040;
+                border-radius: 8px;
+                padding: 10px;
+                margin: 5px;
+            }
+        """)
+        quick_layout = QVBoxLayout()
+        
+        quick_label = QLabel("🚀 Quick Start:")
+        quick_label.setStyleSheet("color: #ffffff; font-weight: bold; margin-bottom: 8px;")
+        quick_layout.addWidget(quick_label)
+        
+        # Horizontal layout for quick start buttons
+        quick_buttons_layout = QHBoxLayout()
+        
+        # Enhanced test goals button (most prominent)
+        self.test_button = QPushButton("🧪 Try Sample Tasks")
+        self.test_button.clicked.connect(self.add_test_goals_and_proceed)
+        self.test_button.setToolTip("🚀 Instantly try the app with 20 realistic work tasks!")
+        self.test_button.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                font-weight: bold;
+                font-size: 13px;
+                padding: 12px;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #34ce57;
+            }
+        """)
+        quick_buttons_layout.addWidget(self.test_button)
+        
+        # Enhanced clipboard import button
+        self.clipboard_button = QPushButton("📋 Import List")
+        self.clipboard_button.clicked.connect(self.add_goals_from_clipboard_and_proceed)
+        self.clipboard_button.setToolTip("📄 Paste a list of tasks from your clipboard!")
+        self.clipboard_button.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                font-weight: bold;
+                font-size: 13px;
+                padding: 12px;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
+        quick_buttons_layout.addWidget(self.clipboard_button)
+        
+        quick_layout.addLayout(quick_buttons_layout)
+        quick_start_frame.setLayout(quick_layout)
+        layout.addWidget(quick_start_frame)
+        
+        # Separator
+        separator = QLabel("─── or add manually ───")
+        separator.setStyleSheet("color: #888888; text-align: center; margin: 15px 0px;")
+        separator.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(separator)
+        
+        # Simplified manual input
+        form_layout = QVBoxLayout()
+        
+        self.task_input = QLineEdit()
+        self.task_input.setPlaceholderText("Type a task and press Enter...")
+        self.task_input.setToolTip("💡 Type a task name and press Enter to add it quickly!")
+        self.task_input.returnPressed.connect(self.add_task_and_auto_proceed)
+        self.task_input.setStyleSheet("""
+            QLineEdit {
+                padding: 12px;
+                font-size: 14px;
+                border-radius: 6px;
+                border: 2px solid #555555;
+            }
+            QLineEdit:focus {
+                border: 2px solid #2a82da;
+            }
+        """)
+        form_layout.addWidget(self.task_input)
+        
+        # Add button (less prominent since Enter is preferred)
+        self.add_button = QPushButton("➕ Add Task")
+        self.add_button.clicked.connect(self.add_task_and_auto_proceed)
+        self.add_button.setStyleSheet("""
             QPushButton {
                 background-color: #6c757d;
-                font-size: 11px;
-                padding: 5px 10px;
-                max-width: 60px;
-                margin-left: 10px;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 12px;
             }
             QPushButton:hover {
                 background-color: #5a6268;
             }
         """)
-        
-        instruction_layout.addWidget(instruction_label)
-        instruction_layout.addStretch()
-        instruction_layout.addWidget(help_button)
-        layout.addLayout(instruction_layout)
-        
-        form_layout = QHBoxLayout()
-        self.task_input = QLineEdit()
-        self.task_input.setPlaceholderText("e.g., Complete project proposal, Review code, etc.")
-        self.task_input.setToolTip("💡 Enter a task or goal name here.\nPress Enter or click 'Add Goal' to add it to your list.")
-        self.task_input.returnPressed.connect(self.add_task)
-        
-        form_layout.addWidget(QLabel("Task:"))
-        form_layout.addWidget(self.task_input)
-        
-        # Enhanced Add Goal button with icon and tooltip
-        self.add_button = QPushButton("➕ Add Goal")
-        self.add_button.clicked.connect(self.add_task)
-        self.add_button.setToolTip("🎯 Add the task you typed to your goal list.\n\nTip: You can also press Enter in the text field!")
         form_layout.addWidget(self.add_button)
-        
-        # Enhanced clipboard import button
-        self.clipboard_button = QPushButton("📋 Import from Clipboard")
-        self.clipboard_button.clicked.connect(self.add_goals_from_clipboard)
-        self.clipboard_button.setToolTip("📄 Import multiple tasks at once!\n\n• Copy a list of tasks (one per line) to your clipboard\n• Click this button to import them all\n• Perfect for pasting from documents or emails")
-        form_layout.addWidget(self.clipboard_button)
-        
-        # Enhanced test goals button
-        self.test_button = QPushButton("🧪 Load Sample Data")
-        self.test_button.clicked.connect(self.add_test_goals)
-        self.test_button.setToolTip("🚀 Try the app with sample tasks!\n\n• Loads 20 realistic work tasks\n• Great for exploring features\n• Mix of different priorities and time estimates")
-        form_layout.addWidget(self.test_button)
         
         layout.addLayout(form_layout)
         
-        # Add helper text for the table
-        table_help = QLabel("📌 Your tasks will appear below. You can add as many as you need!")
-        table_help.setStyleSheet("color: #cccccc; font-size: 11px; padding: 5px;")
-        layout.addWidget(table_help)
+        # Task list (more compact)
+        list_label = QLabel("📋 Your Tasks:")
+        list_label.setStyleSheet("color: #ffffff; font-weight: bold; margin-top: 20px; margin-bottom: 5px;")
+        layout.addWidget(list_label)
         
         self.input_table = QTableWidget()
         self.input_table.setColumnCount(1)
-        self.input_table.setHorizontalHeaderLabels(["📋 Your Tasks"])
-        self.input_table.setToolTip("📝 All your tasks are listed here.\n\nTip: Make sure to add all your tasks before proceeding to the plot!")
+        self.input_table.setHorizontalHeaderLabels(["Task"])
+        self.input_table.setMaximumHeight(200)  # Limit height
+        self.input_table.setStyleSheet("""
+            QTableWidget {
+                border-radius: 4px;
+                font-size: 12px;
+            }
+        """)
         layout.addWidget(self.input_table)
         
-        # Enhanced Done button
-        self.done_button = QPushButton("✅ Ready to Prioritize!")
-        self.done_button.clicked.connect(self.finish_input)
-        self.done_button.setToolTip("🎯 Ready to visualize your priorities?\n\n• Takes you to the interactive plot\n• You'll be able to drag tasks around\n• Value vs Time visualization helps you prioritize")
-        self.done_button.setStyleSheet("""
+        # Help button (smaller, less prominent)
+        help_button = QPushButton("❓ Help")
+        help_button.clicked.connect(self.show_help)
+        help_button.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                font-size: 11px;
+                padding: 6px 12px;
+                border-radius: 4px;
+                margin-top: 10px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """)
+        layout.addWidget(help_button)
+        
+        layout.addStretch()
+        self.input_panel.setLayout(layout)
+        self.refresh_input_table()
+
+    def initPlotPanel(self):
+        layout = QVBoxLayout()
+        
+        # Header with real-time priority info
+        self.priority_header = QLabel("🎯 Drag tasks to prioritize • Top 3 priorities shown below")
+        self.priority_header.setStyleSheet("color: #ffffff; font-weight: bold; padding: 10px; font-size: 14px;")
+        layout.addWidget(self.priority_header)
+        
+        # Create splitter for plot and live results
+        plot_splitter = QSplitter(Qt.Orientation.Vertical)
+        
+        # Plot area
+        plot_widget = QWidget()
+        plot_layout = QVBoxLayout()
+        
+        self.figure = Figure(figsize=(6, 4), facecolor='#353535')
+        self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.add_subplot(111)
+        
+        # Set modern plot style
+        self.ax.set_facecolor('#353535')
+        self.ax.grid(True, linestyle='--', alpha=0.3, color='#555555')
+        self.ax.spines['bottom'].set_color('#555555')
+        self.ax.spines['top'].set_color('#555555')
+        self.ax.spines['left'].set_color('#555555')
+        self.ax.spines['right'].set_color('#555555')
+        
+        # Set labels with modern styling
+        self.ax.set_xlabel('* Value (Impact/Importance)', color='white', fontsize=11, fontweight='bold')
+        self.ax.set_ylabel('Time Investment (Hours)', color='white', fontsize=11, fontweight='bold')
+        self.ax.set_title('Interactive Priority Matrix', color='white', fontsize=13, fontweight='bold', pad=15)
+        
+        # Style the ticks
+        self.ax.tick_params(colors='white', which='both')
+        
+        # Set fixed axis limits
+        self.ax.set_xlim(0, 6)
+        self.ax.set_ylim(0, 8)
+        
+        # Connect mouse events
+        self.canvas.mpl_connect('button_press_event', self.on_press)
+        self.canvas.mpl_connect('button_release_event', self.on_release)
+        self.canvas.mpl_connect('motion_notify_event', self.on_motion)
+        self.canvas.mpl_connect('motion_notify_event', self.on_hover)
+        
+        plot_layout.addWidget(self.canvas)
+        plot_widget.setLayout(plot_layout)
+        
+        # Live results area
+        results_widget = QWidget()
+        results_widget.setMaximumHeight(200)
+        results_layout = QVBoxLayout()
+        
+        # Live priority list header
+        live_header = QLabel("🏆 Live Priority Ranking")
+        live_header.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; padding: 5px;")
+        results_layout.addWidget(live_header)
+        
+        # Compact results table
+        self.live_table = QTableWidget()
+        self.live_table.setColumnCount(4)
+        self.live_table.setHorizontalHeaderLabels(['🏆', 'Task', 'Value', 'Score'])
+        self.live_table.setStyleSheet("""
+            QTableWidget {
+                font-size: 11px;
+                border-radius: 4px;
+            }
+            QHeaderView::section {
+                padding: 4px;
+                font-size: 10px;
+            }
+        """)
+        # Hide row numbers and make it more compact
+        self.live_table.verticalHeader().setVisible(False)
+        self.live_table.setAlternatingRowColors(True)
+        results_layout.addWidget(self.live_table)
+        
+        # Export button (always visible)
+        self.export_button = QPushButton('📊 Export to Excel')
+        self.export_button.clicked.connect(self.export_to_excel)
+        self.export_button.setToolTip("💾 Save your prioritized task list to Excel")
+        self.export_button.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
                 font-weight: bold;
-                font-size: 14px;
-                padding: 12px;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
             }
             QPushButton:hover {
                 background-color: #34ce57;
             }
-            QPushButton:pressed {
-                background-color: #1e7e34;
-            }
         """)
-        layout.addWidget(self.done_button)
-        self.input_tab.setLayout(layout)
-        self.refresh_input_table()
+        results_layout.addWidget(self.export_button)
+        
+        results_widget.setLayout(results_layout)
+        
+        # Add to splitter
+        plot_splitter.addWidget(plot_widget)
+        plot_splitter.addWidget(results_widget)
+        plot_splitter.setSizes([300, 200])  # Give more space to plot
+        
+        layout.addWidget(plot_splitter)
+        self.plot_panel.setLayout(layout)
 
-    def add_test_goals(self):
+    def add_test_goals_and_proceed(self):
+        """Add test goals and automatically proceed to plot view"""
         test_goals = [
             ("Complete Project Proposal", 4.5, 3.0),
             ("Review Code Changes", 3.0, 2.0),
@@ -168,23 +335,15 @@ class PriorityPlotWidget(QWidget):
             self.task_list.append(Task(task_name, value, time))
         
         self.refresh_input_table()
+        self.proceed_to_plot()
 
-    def add_task(self):
-        task = self.task_input.text().strip()
-        if not task:
-            QMessageBox.warning(self, "⚠️ Input Required", "🎯 Please enter a task name first!\n\nExample: 'Complete project proposal' or 'Review code changes'")
-            return
-        # Initialize with default values within our valid range
-        self.task_list.append(Task(task, 3.0, 4.0))  # Default to middle of our ranges
-        self.task_input.clear()
-        self.refresh_input_table()
-
-    def add_goals_from_clipboard(self):
+    def add_goals_from_clipboard_and_proceed(self):
+        """Add goals from clipboard and automatically proceed if successful"""
         clipboard = QApplication.clipboard()
         text = clipboard.text().strip()
         
         if not text:
-            QMessageBox.warning(self, "📋 Clipboard Empty", "❌ No text found in clipboard!\n\n💡 To use this feature:\n• Copy a list of tasks (one per line)\n• Come back and click this button")
+            QMessageBox.warning(self, "📋 Clipboard Empty", "❌ No text found in clipboard!\n\n💡 Copy a list of tasks (one per line) and try again.")
             return
             
         goals = [goal.strip() for goal in text.split('\n') if goal.strip()]
@@ -197,98 +356,97 @@ class PriorityPlotWidget(QWidget):
             self.task_list.append(Task(goal, 3.0, 4.0))  # Default to middle of our ranges
             
         self.refresh_input_table()
-        QMessageBox.information(self, "✅ Success!", f"🎉 Added {len(goals)} tasks from clipboard!\n\nYou can now add more tasks or proceed to prioritize.")
+        
+        # Auto-proceed if we have a reasonable number of tasks
+        if len(goals) >= 3:
+            self.proceed_to_plot()
+        else:
+            QMessageBox.information(self, "✅ Tasks Added!", f"Added {len(goals)} tasks. Add more or click a task to start prioritizing!")
+
+    def add_task_and_auto_proceed(self):
+        """Add a task and auto-proceed to plot if we have enough tasks"""
+        task = self.task_input.text().strip()
+        if not task:
+            QMessageBox.warning(self, "⚠️ Input Required", "🎯 Please enter a task name first!")
+            return
+        
+        self.task_list.append(Task(task, 3.0, 4.0))  # Default to middle of our ranges
+        self.task_input.clear()
+        self.refresh_input_table()
+        
+        # Auto-proceed if we have 3 or more tasks
+        if len(self.task_list) >= 3:
+            self.proceed_to_plot()
+        elif len(self.task_list) == 1:
+            # Give encouraging feedback for first task
+            self.task_input.setPlaceholderText("Great! Add 2 more tasks to start prioritizing...")
+
+    def proceed_to_plot(self):
+        """Smoothly transition to the plot view"""
+        if not self.task_list:
+            return
+            
+        # Show both panels
+        self.plot_panel.show()
+        self.main_splitter.setSizes([350, 650])  # Give more space to plot
+        
+        # Update plot and live results
+        self.update_plot()
+        self.update_priority_display()
+        
+        # Minimize input panel after a moment (optional)
+        QTimer.singleShot(2000, lambda: self.main_splitter.setSizes([250, 750]))
+
+    def update_priority_display(self):
+        """Update the live priority ranking table"""
+        if not self.task_list:
+            return
+            
+        # Calculate scores
+        for task in self.task_list:
+            task.calculate_score()
+            
+        # Sort by score
+        sorted_tasks = sorted(self.task_list, key=lambda t: t.score, reverse=True)
+        
+        # Update live table (show top 10)
+        display_count = min(10, len(sorted_tasks))
+        self.live_table.setRowCount(display_count)
+        
+        for i, task in enumerate(sorted_tasks[:display_count]):
+            # Rank
+            rank_item = QTableWidgetItem(f"#{i+1}")
+            rank_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.live_table.setItem(i, 0, rank_item)
+            
+            # Task name (truncated if too long)
+            task_name = task.task if len(task.task) <= 25 else task.task[:22] + "..."
+            self.live_table.setItem(i, 1, QTableWidgetItem(task_name))
+            
+            # Value
+            value_item = QTableWidgetItem(f"{task.value:.1f}")
+            value_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.live_table.setItem(i, 2, value_item)
+            
+            # Score
+            score_item = QTableWidgetItem(f"{task.score:.2f}")
+            score_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.live_table.setItem(i, 3, score_item)
+            
+            # Highlight top 3
+            if i < 3:
+                for col in range(4):
+                    item = self.live_table.item(i, col)
+                    if item:
+                        item.setBackground(QColor(42, 130, 218, 100))  # Light blue highlight
+        
+        # Auto-resize columns
+        self.live_table.resizeColumnsToContents()
 
     def refresh_input_table(self):
         self.input_table.setRowCount(len(self.task_list))
         for i, t in enumerate(self.task_list):
             self.input_table.setItem(i, 0, QTableWidgetItem(t.task))
-
-    def finish_input(self):
-        if not self.task_list:
-            QMessageBox.warning(self, "❌ No Tasks Added", "🎯 Please add at least one task before proceeding!\n\n💡 You can:\n• Type a task manually\n• Import from clipboard\n• Load sample data to try the app")
-            return
-        self.tabs.setTabEnabled(1, True)
-        self.tabs.setTabEnabled(2, True)
-        self.tabs.setCurrentWidget(self.plot_tab)
-        self.update_plot()
-
-    def initPlotTab(self):
-        layout = QVBoxLayout()
-        
-        # Add instructional header
-        plot_instruction = QLabel("🎯 Drag tasks around the plot to set their Value (→) and Time Investment (↑)")
-        plot_instruction.setStyleSheet("color: #ffffff; font-weight: bold; padding: 10px; text-align: center;")
-        layout.addWidget(plot_instruction)
-        
-        # Add helpful tips
-        tips_label = QLabel("💡 Bottom-right = High Value + Low Time = TOP PRIORITY! | Hover over points for details")
-        tips_label.setStyleSheet("color: #cccccc; font-size: 11px; padding: 5px; text-align: center;")
-        layout.addWidget(tips_label)
-        
-        self.figure = Figure(figsize=(5, 4), facecolor='#353535')
-        self.canvas = FigureCanvas(self.figure)
-        self.ax = self.figure.add_subplot(111)
-        
-        # Set modern plot style
-        self.ax.set_facecolor('#353535')
-        self.ax.grid(True, linestyle='--', alpha=0.3, color='#555555')
-        self.ax.spines['bottom'].set_color('#555555')
-        self.ax.spines['top'].set_color('#555555')
-        self.ax.spines['left'].set_color('#555555')
-        self.ax.spines['right'].set_color('#555555')
-        
-        # Set labels with modern styling
-        self.ax.set_xlabel('★ Value (Impact/Importance)', color='white', fontsize=10, fontweight='bold')
-        self.ax.set_ylabel('⏰ Time Investment (Hours)', color='white', fontsize=10, fontweight='bold')
-        self.ax.set_title('🎯 Interactive Task Priority Matrix', color='white', fontsize=12, fontweight='bold', pad=20)
-        
-        # Style the ticks
-        self.ax.tick_params(colors='white', which='both')
-        
-        # Set fixed axis limits
-        self.ax.set_xlim(0, 6)
-        self.ax.set_ylim(0, 8)
-        
-        # Connect mouse events
-        self.canvas.mpl_connect('button_press_event', self.on_press)
-        self.canvas.mpl_connect('button_release_event', self.on_release)
-        self.canvas.mpl_connect('motion_notify_event', self.on_motion)
-        self.canvas.mpl_connect('motion_notify_event', self.on_hover)
-        
-        self.scatter = self.ax.scatter(
-            [t.value for t in self.task_list],
-            [t.time for t in self.task_list],
-            picker=True,
-            alpha=0.7
-        )
-        
-        # Adjust figure layout
-        self.figure.tight_layout()
-        self.canvas.draw()
-        
-        layout.addWidget(self.canvas)
-        
-        # Enhanced Apply button
-        self.apply_button = QPushButton('🚀 Generate Priority Ranking')
-        self.apply_button.clicked.connect(self.showTable)
-        self.apply_button.setToolTip("📊 Create your priority-ranked task list!\n\n• Calculates priority scores based on Value/Time ratio\n• Shows you which tasks to do first\n• Takes you to the results table")
-        self.apply_button.setStyleSheet("""
-            QPushButton {
-                background-color: #007bff;
-                font-weight: bold;
-                font-size: 14px;
-                padding: 12px;
-            }
-            QPushButton:hover {
-                background-color: #0056b3;
-            }
-            QPushButton:pressed {
-                background-color: #004085;
-            }
-        """)
-        layout.addWidget(self.apply_button)
-        self.plot_tab.setLayout(layout)
 
     def on_press(self, event):
         if event.inaxes != self.ax:
@@ -303,8 +461,8 @@ class PriorityPlotWidget(QWidget):
             return
         
         # Update task values
-        self.task_list[self.drag_index].value = event.xdata
-        self.task_list[self.drag_index].time = event.ydata
+        self.task_list[self.drag_index].value = max(0, min(6, event.xdata))  # Clamp to valid range
+        self.task_list[self.drag_index].time = max(0, min(8, event.ydata))   # Clamp to valid range
         self.moved_points.add(self.drag_index)  # Mark this point as moved
         
         # Update scatter plot data directly for smooth movement
@@ -318,11 +476,16 @@ class PriorityPlotWidget(QWidget):
                 annotation.set_position((event.xdata, event.ydata))
         
         self.canvas.draw_idle()  # Use draw_idle for smoother updates
+        
+        # Trigger real-time priority update with a small delay
+        self.auto_update_timer.start(100)  # Update after 100ms of no movement
 
     def on_release(self, event):
         if self.dragging:
             # Do a full redraw when drag is complete
             self.update_plot()
+            # Update priority display immediately
+            self.update_priority_display()
         self.dragging = False
         self.drag_index = None
 
@@ -344,7 +507,8 @@ class PriorityPlotWidget(QWidget):
                 self.current_annotation.set_visible(False)
             
             # Create new annotation with task name and values
-            text = f"{task.task}\nValue: {task.value:.1f}\nTime: {task.time:.1f}"
+            priority_score = task.value / task.time if task.time > 0 else 0
+            text = f"{task.task}\nValue: {task.value:.1f}\nTime: {task.time:.1f}\nPriority: {priority_score:.2f}"
             self.current_annotation = self.ax.annotate(
                 text,
                 xy=(task.value, task.time),
@@ -384,9 +548,9 @@ class PriorityPlotWidget(QWidget):
         self.ax.spines['right'].set_color('#555555')
         
         # Set labels with modern styling
-        self.ax.set_xlabel('★ Value (Impact/Importance)', color='white', fontsize=10, fontweight='bold')
-        self.ax.set_ylabel('⏰ Time Investment (Hours)', color='white', fontsize=10, fontweight='bold')
-        self.ax.set_title('🎯 Interactive Task Priority Matrix', color='white', fontsize=12, fontweight='bold', pad=20)
+        self.ax.set_xlabel('* Value (Impact/Importance)', color='white', fontsize=11, fontweight='bold')
+        self.ax.set_ylabel('Time Investment (Hours)', color='white', fontsize=11, fontweight='bold')
+        self.ax.set_title('Interactive Priority Matrix', color='white', fontsize=13, fontweight='bold', pad=15)
         
         # Style the ticks
         self.ax.tick_params(colors='white', which='both')
@@ -438,46 +602,6 @@ class PriorityPlotWidget(QWidget):
         # Adjust figure layout
         self.figure.tight_layout()
         self.canvas.draw()
-
-    def initTableTab(self):
-        layout = QVBoxLayout()
-        
-        # Add results header
-        results_header = QLabel("🏆 Your Prioritized Task List - Ranked by Priority Score")
-        results_header.setStyleSheet("color: #ffffff; font-weight: bold; padding: 10px; font-size: 14px;")
-        layout.addWidget(results_header)
-        
-        # Add explanation
-        explanation = QLabel("📈 Higher priority score = Better Value/Time ratio. Focus on tasks at the top!")
-        explanation.setStyleSheet("color: #cccccc; font-size: 11px; padding: 5px;")
-        layout.addWidget(explanation)
-        
-        self.table = QTableWidget()
-        self.table.setToolTip("📋 Your tasks ranked by priority score.\n\n• Top tasks = highest value for time invested\n• Priority Score = Value ÷ Time\n• Focus on the highest scoring tasks first!")
-        self.table.setHorizontalHeaderLabels(['📋 Task', '★ Value', '⏰ Time', '🏆 Priority Score'])
-        layout.addWidget(self.table)
-        
-        # Enhanced export button
-        self.export_button = QPushButton('📊 Export to Excel')
-        self.export_button.clicked.connect(self.export_to_excel)
-        self.export_button.setToolTip("💾 Save your prioritized task list!\n\n• Creates a professional Excel spreadsheet\n• Includes all task details and priority scores\n• Perfect for sharing with your team")
-        self.export_button.setStyleSheet("""
-            QPushButton {
-                background-color: #28a745;
-                font-weight: bold;
-                font-size: 13px;
-                padding: 10px;
-            }
-            QPushButton:hover {
-                background-color: #34ce57;
-            }
-            QPushButton:pressed {
-                background-color: #1e7e34;
-            }
-        """)
-        layout.addWidget(self.export_button)
-        
-        self.table_tab.setLayout(layout)
 
     def export_to_excel(self):
         if not self.task_list:
@@ -532,46 +656,36 @@ class PriorityPlotWidget(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "❌ Export Error", f"😞 Failed to export your data:\n\n{str(e)}\n\n💡 Try saving to a different location or check file permissions.")
 
-    def showTable(self):
-        sorted_tasks = calculate_and_sort_tasks(self.task_list)
-        self.table.setRowCount(len(sorted_tasks))
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(['📋 Task', '★ Value', '⏰ Time', '🏆 Priority Score'])
-        for i, t in enumerate(sorted_tasks):
-            self.table.setItem(i, 0, QTableWidgetItem(t.task))
-            self.table.setItem(i, 1, QTableWidgetItem(f"{t.value:.2f}"))
-            self.table.setItem(i, 2, QTableWidgetItem(f"{t.time:.2f}"))
-            self.table.setItem(i, 3, QTableWidgetItem(f"{t.score:.2f}"))
-        self.tabs.setCurrentWidget(self.table_tab)
-
     def show_help(self):
         help_text = """
 🎯 <b>Welcome to PriPlot - Your Task Priority Assistant!</b>
 
-<b>📝 STEP 1: Add Your Tasks</b>
-• Type task names manually or import from clipboard
-• Use "Load Sample Data" to try the app with example tasks
-• Add as many tasks as you need - there's no limit!
+<b>🚀 Quick Start Options:</b>
+• "🧪 Try Sample Tasks" - Instantly explore with 20 realistic work tasks
+• "📋 Import List" - Paste tasks from your clipboard (one per line)
+• Type manually and press Enter to add tasks one by one
 
-<b>📊 STEP 2: Visualize & Prioritize</b>
-• Click "Ready to Prioritize!" to open the interactive plot
+<b>📊 Interactive Prioritization:</b>
+• Once you have 3+ tasks, the plot automatically appears
 • Drag tasks around to set their Value (→) and Time Investment (↑)
 • Bottom-right corner = High Value + Low Time = TOP PRIORITY!
+• See live priority rankings update as you drag
 
-<b>📋 STEP 3: Get Your Results</b>
-• Click "Generate Priority Ranking" to see your sorted task list
-• Tasks are ranked by Priority Score (Value ÷ Time)
-• Export to Excel to share with your team
+<b>🏆 Understanding Your Results:</b>
+• Priority Score = Value ÷ Time (higher is better)
+• Top 3 tasks get special numbered circles on the plot
+• Live ranking table shows your current priorities
+• Export to Excel anytime to save your analysis
 
 <b>💡 Pro Tips:</b>
-• Hover over plot points to see task details
+• Hover over plot points to see task details and priority scores
 • Red points = original position, Blue points = you moved them
-• Top 3 priority tasks get special numbered circles
-• Focus on high-value, low-time tasks for maximum impact!
+• Focus on high-value, low-time tasks for maximum impact
+• The interface adapts as you work - no need to click through tabs!
 
 <b>🎨 What the Numbers Mean:</b>
-• Value (1-6): How important/impactful is this task?
-• Time (1-8): How many hours will this take?
+• Value (0-6): How important/impactful is this task?
+• Time (0-8): How many hours will this take?
 • Priority Score: Automatically calculated as Value ÷ Time
 
 Happy prioritizing! 🚀
@@ -599,13 +713,14 @@ Happy prioritizing! 🚀
 
 Transform your task management with smart priority visualization!
 
-<b>🚀 Quick Start:</b>
-• Add your tasks in the "Input Goals" tab
-• Drag them around in the "Plot" tab to set Value vs Time
-• Get your prioritized list in the "Table" tab
+<b>🚀 New Streamlined Experience:</b>
+• Choose "🧪 Try Sample Tasks" for instant exploration
+• Or "📋 Import List" to paste your own tasks
+• Add 3+ tasks and the plot appears automatically
+• See live priority updates as you drag tasks around
 
-<b>💡 New to PriPlot?</b>
-Click the "❓ Help" button for detailed instructions, or try the "🧪 Load Sample Data" to explore with example tasks.
+<b>💡 No more clicking through tabs!</b>
+Everything flows naturally as you work. The interface adapts to show you exactly what you need, when you need it.
 
 Ready to boost your productivity? 🎯
         """
