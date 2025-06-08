@@ -835,6 +835,27 @@ class PriorityPlotWidget(QWidget):
         """)
         scheduled_layout.addWidget(clear_button)
         
+        # Add task button for calendar
+        add_task_button = QPushButton("➕ Add Task")
+        add_task_button.clicked.connect(self.add_task_from_calendar)
+        add_task_button.setToolTip("Create a new task for the selected date")
+        add_task_button.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: bold;
+                margin-top: 5px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+        scheduled_layout.addWidget(add_task_button)
+        
         scheduled_frame.setLayout(scheduled_layout)
         calendar_layout.addWidget(scheduled_frame)
         
@@ -1634,4 +1655,169 @@ Ready to boost your productivity? 🎯
         """Update the selected date display label"""
         if hasattr(self, 'selected_date_label'):
             selected_date = self.calendar.selectedDate().toString("dddd, MMMM d, yyyy")
-            self.selected_date_label.setText(f"📍 Selected: {selected_date}") 
+            self.selected_date_label.setText(f"📍 Selected: {selected_date}")
+
+    def add_task_from_calendar(self):
+        """Add a new task directly from the calendar view"""
+        selected_date = self.calendar.selectedDate()
+        selected_date_str = selected_date.toString("dddd, MMMM d, yyyy")
+        
+        # Create a dialog for task creation
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"➕ Add Task for {selected_date_str}")
+        dialog.setModal(True)
+        dialog.resize(400, 300)
+        
+        # Apply dark theme to dialog
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #353535;
+                color: white;
+            }
+            QLabel {
+                color: white;
+                font-size: 13px;
+            }
+            QLineEdit {
+                background-color: #555555;
+                color: white;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 12px;
+            }
+            QLineEdit:focus {
+                border: 2px solid #2a82da;
+            }
+            QPushButton {
+                background-color: #2a82da;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: 500;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #3292ea;
+            }
+            QPushButton:pressed {
+                background-color: #1a72ca;
+            }
+            QTimeEdit {
+                background-color: #555555;
+                color: white;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 12px;
+            }
+        """)
+        
+        layout = QVBoxLayout()
+        
+        # Date display
+        date_label = QLabel(f"📅 Creating task for: {selected_date_str}")
+        date_label.setStyleSheet("font-weight: bold; margin-bottom: 15px; color: #2a82da;")
+        layout.addWidget(date_label)
+        
+        # Task name input
+        form_layout = QFormLayout()
+        
+        task_input = QLineEdit()
+        task_input.setPlaceholderText("Enter task name...")
+        form_layout.addRow("📋 Task Name:", task_input)
+        
+        # Value input
+        value_input = QLineEdit()
+        value_input.setPlaceholderText("1.0-5.0 (importance/impact)")
+        value_input.setText("3.0")
+        form_layout.addRow("★ Value:", value_input)
+        
+        # Time input
+        time_input = QLineEdit()
+        time_input.setPlaceholderText("0.5-8.0 (hours needed)")
+        time_input.setText("2.0")
+        form_layout.addRow("⏰ Time (hrs):", time_input)
+        
+        # Start time
+        start_time = QTimeEdit()
+        start_time.setTime(QTime(9, 0))
+        start_time.setDisplayFormat("hh:mm AP")
+        form_layout.addRow("🕐 Start Time:", start_time)
+        
+        # End time
+        end_time = QTimeEdit()
+        end_time.setTime(QTime(11, 0))
+        end_time.setDisplayFormat("hh:mm AP")
+        form_layout.addRow("🕐 End Time:", end_time)
+        
+        layout.addLayout(form_layout)
+        
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        
+        dialog.setLayout(layout)
+        
+        # Focus on task name input
+        task_input.setFocus()
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            task_name = task_input.text().strip()
+            if not task_name:
+                QMessageBox.warning(self, "❌ Invalid Input", "Please enter a task name!")
+                return
+                
+            try:
+                value = float(value_input.text())
+                time = float(time_input.text())
+                
+                if value < 0 or value > 5:
+                    raise ValueError("Value must be between 0 and 5")
+                if time <= 0 or time > 10:
+                    raise ValueError("Time must be between 0.1 and 10 hours")
+                    
+            except ValueError as e:
+                QMessageBox.warning(self, "❌ Invalid Input", f"Please enter valid numbers:\n\n{str(e)}")
+                return
+            
+            # Create new task
+            new_task = Task(task_name, value, time)
+            
+            # Schedule it on the selected date
+            selected_datetime = datetime.combine(
+                datetime(selected_date.year(), selected_date.month(), selected_date.day()).date(),
+                datetime.min.time()
+            )
+            
+            start_time_str = start_time.time().toString("hh:mm AP")
+            end_time_str = end_time.time().toString("hh:mm AP")
+            
+            new_task.schedule_on_calendar(selected_datetime, start_time_str, end_time_str)
+            
+            # Add to task list
+            if not hasattr(self, 'task_list') or self.task_list is None:
+                self.task_list = []
+            
+            self.task_list.append(new_task)
+            
+            # Update all displays
+            self.update_priority_display()
+            self.update_scheduled_tasks_display() 
+            self.refresh_input_table()
+            
+            # Refresh calendar to show bold formatting
+            self.calendar.refresh_calendar_display()
+            
+            # Show success message
+            QMessageBox.information(
+                self, 
+                "✅ Task Created!", 
+                f"🎉 Created and scheduled '{task_name}' for {selected_date_str}\n\n"
+                f"⏰ Time: {start_time_str} - {end_time_str}\n"
+                f"★ Value: {value} | ⏰ Time: {time} hrs\n\n"
+                f"💡 The task is now available in your priority chart and calendar!"
+            ) 
