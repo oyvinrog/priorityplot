@@ -1,10 +1,23 @@
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow
-from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtGui import QPalette, QColor, QFont, QFontDatabase
 from .plot_widget import PriorityPlotWidget
 
 def main():
     app = QApplication(sys.argv)
+    
+    # Configure font fallback for emoji support
+    try:
+        emoji_font_id = QFontDatabase.addApplicationFont("/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf")
+        if emoji_font_id != -1:
+            emoji_families = QFontDatabase.applicationFontFamilies(emoji_font_id)
+            if emoji_families:
+                emoji_family = emoji_families[0]
+                # Set up font substitution for emoji support
+                QFont.insertSubstitution("DejaVu Sans", emoji_family)
+    except Exception as e:
+        # If emoji font setup fails, continue without it
+        pass
     
     # Set modern color scheme
     app.setStyle("Fusion")

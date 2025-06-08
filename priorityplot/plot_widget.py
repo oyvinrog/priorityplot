@@ -2,10 +2,10 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QTabWidget, QTab
                              QTableWidgetItem, QLineEdit, QLabel, QHBoxLayout, QMessageBox, 
                              QFileDialog, QSplitter, QFrame, QCalendarWidget, QTimeEdit, 
                              QListWidget, QListWidgetItem, QGroupBox, QFormLayout, QAbstractItemView,
-                             QDialog, QDialogButtonBox, QHeaderView)
+                             QDialog, QDialogButtonBox, QHeaderView, QInputDialog)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt6.QtCore import Qt, QTimer, QDate, QTime, QMimeData, QPoint
+from PyQt6.QtCore import Qt, QTimer, QDate, QTime, QMimeData, QPoint, QThread, pyqtSignal
 from PyQt6.QtGui import QClipboard, QColor, QDrag, QPixmap, QPainter, QFont, QFontMetrics
 from .model import Task, calculate_and_sort_tasks
 from .task_manager import TaskManager
@@ -14,6 +14,72 @@ import numpy as np
 from openpyxl import Workbook
 from datetime import datetime
 from PyQt6.QtWidgets import QApplication
+import os
+
+class ExcelExportWorker(QThread):
+    """Worker thread for Excel export to prevent UI freezing"""
+    finished = pyqtSignal(str)  # Emits file path on success
+    error = pyqtSignal(str)     # Emits error message on failure
+    progress = pyqtSignal(str)  # Emits progress updates
+    
+    def __init__(self, task_list, file_path):
+        super().__init__()
+        self.task_list = task_list
+        self.file_path = file_path
+        
+    def run(self):
+        """Run the export process in a separate thread"""
+        try:
+            self.progress.emit("Creating Excel workbook...")
+            
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Task Priorities"
+            
+            self.progress.emit("Adding headers...")
+            
+            # Add headers including calendar information
+            headers = ['📋 Task', '★ Value', '⏰ Time (hours)', '🏆 Priority Score', 
+                      '📅 Scheduled Date', '🕐 Start Time', '🕐 End Time']
+            for col, header in enumerate(headers, 1):
+                ws.cell(row=1, column=col, value=header)
+            
+            self.progress.emit("Processing task data...")
+            
+            # Add data
+            sorted_tasks = calculate_and_sort_tasks(self.task_list)
+            for row, task in enumerate(sorted_tasks, 2):
+                ws.cell(row=row, column=1, value=task.task)
+                ws.cell(row=row, column=2, value=task.value)
+                ws.cell(row=row, column=3, value=task.time)
+                ws.cell(row=row, column=4, value=task.score)
+                
+                # Add calendar scheduling information
+                if task.is_scheduled():
+                    ws.cell(row=row, column=5, value=task.scheduled_date.strftime('%Y-%m-%d'))
+                    ws.cell(row=row, column=6, value=task.scheduled_start_time if task.scheduled_start_time else "")
+                    ws.cell(row=row, column=7, value=task.scheduled_end_time if task.scheduled_end_time else "")
+                else:
+                    ws.cell(row=row, column=5, value="Not scheduled")
+                    ws.cell(row=row, column=6, value="")
+                    ws.cell(row=row, column=7, value="")
+            
+            self.progress.emit("Formatting columns...")
+            
+            # Simple column width adjustment to avoid complexity
+            for col in range(1, 8):
+                ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = 15
+            
+            self.progress.emit("Saving file...")
+            
+            # Save the file
+            wb.save(self.file_path)
+            
+            self.progress.emit("Export completed!")
+            self.finished.emit(self.file_path)
+            
+        except Exception as e:
+            self.error.emit(str(e))
 
 class ScheduleCalendarWidget(QCalendarWidget):
     """Custom calendar widget that shows days with scheduled tasks in bold"""
@@ -429,6 +495,11 @@ class PriorityPlotWidget(QWidget):
         self.auto_update_timer = QTimer()  # Timer for real-time updates
         self.auto_update_timer.timeout.connect(self.update_priority_display)
         self.auto_update_timer.setSingleShot(True)
+        
+        # Export worker and progress tracking
+        self.export_worker = None
+        self.progress_dialog = None
+        
         self.initUI()
         
         # Show welcome message for new users
@@ -467,7 +538,7 @@ class PriorityPlotWidget(QWidget):
         layout = QVBoxLayout()
         
         # Streamlined header
-        header_label = QLabel("🎯 Add Your Tasks")
+        header_label = QLabel(">> Add Your Tasks")
         header_label.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 16px; padding: 15px 10px 10px 10px;")
         layout.addWidget(header_label)
         
@@ -592,7 +663,7 @@ class PriorityPlotWidget(QWidget):
         layout.addWidget(self.input_table)
         
         # Show Results button (appears when tasks are added)
-        self.show_results_button = QPushButton("🎯 Show Priority Chart & Calendar")
+        self.show_results_button = QPushButton(">> Show Priority Chart & Calendar")
         self.show_results_button.clicked.connect(self.proceed_to_plot)
         self.show_results_button.setToolTip("💡 Ready to prioritize? Click to see your interactive chart and calendar!")
         self.show_results_button.setStyleSheet("""
@@ -642,7 +713,7 @@ class PriorityPlotWidget(QWidget):
         layout.setContentsMargins(5, 0, 5, 5)
         
         # Header with real-time priority info - reduced padding to save space
-        self.priority_header = QLabel("🎯 Drag tasks to prioritize • Drag from priority table to calendar to schedule • Top 3 priorities shown below")
+        self.priority_header = QLabel(">> Drag tasks to prioritize • Drag from priority table to calendar to schedule • Top 3 priorities shown below")
         self.priority_header.setStyleSheet("color: #ffffff; font-weight: bold; padding: 5px; font-size: 14px;")
         layout.addWidget(self.priority_header)
         
@@ -752,7 +823,6 @@ class PriorityPlotWidget(QWidget):
             QTableWidget::item:hover {
                 background-color: #555555;
                 border: 1px solid #2a82da;
-                cursor: pointer;
             }
             QTableWidget::item:selected {
                 background-color: #2a82da;
@@ -802,23 +872,51 @@ class PriorityPlotWidget(QWidget):
         
         results_layout.addWidget(self.live_table)
         
-        # Export button (always visible)
-        self.export_button = QPushButton('📊 Export to Excel')
-        self.export_button.clicked.connect(self.export_to_excel)
-        self.export_button.setToolTip("💾 Save your prioritized task list to Excel with calendar schedule")
-        self.export_button.setStyleSheet("""
+        # Export buttons - prioritize Quick Export (safer)
+        export_container = QVBoxLayout()
+        
+        # PRIMARY: Quick Export button (no dialog issues)
+        self.quick_export_button = QPushButton('📊 Export to Excel (Quick)')
+        self.quick_export_button.clicked.connect(self.quick_export_to_excel)
+        self.quick_export_button.setToolTip("💾 Save to Downloads folder - RECOMMENDED (no dialog issues)")
+        self.quick_export_button.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
+                color: white;
+                border: none;
+                padding: 12px;
+                border-radius: 5px;
                 font-weight: bold;
-                font-size: 12px;
-                padding: 8px;
-                border-radius: 4px;
+                font-size: 13px;
             }
             QPushButton:hover {
-                background-color: #34ce57;
+                background-color: #218838;
             }
         """)
-        results_layout.addWidget(self.export_button)
+        export_container.addWidget(self.quick_export_button)
+        
+        # SECONDARY: Regular export with dialog (may freeze on some systems)
+        self.export_button = QPushButton('📁 Export to Custom Location')
+        self.export_button.clicked.connect(self.export_to_excel)
+        self.export_button.setToolTip("💾 Choose save location (may freeze on some systems)")
+        self.export_button.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
+        export_container.addWidget(self.export_button)
+        
+        # Add export container to results layout
+        results_layout.addLayout(export_container)
         
         results_widget.setLayout(results_layout)
         
@@ -985,7 +1083,7 @@ class PriorityPlotWidget(QWidget):
         # Set labels with modern styling
         self.ax.set_xlabel('* Value (Impact/Importance)', color='white', fontsize=11, fontweight='bold')
         self.ax.set_ylabel('Time Investment (Hours)', color='white', fontsize=11, fontweight='bold')
-        # Shorter title to prevent truncation, matching the initialization
+        # Shorter title to prevent truncation
         self.ax.set_title('Priority Matrix • Click table row to highlight', color='white', fontsize=13, fontweight='bold', pad=10)
         
         # Style the ticks
@@ -1051,27 +1149,188 @@ class PriorityPlotWidget(QWidget):
             QMessageBox.warning(self, "❌ No Data", "There are no tasks to export!\n\n🎯 Add some tasks and prioritize them first.")
             return
             
-        # Get save file path
-        file_path, _ = QFileDialog.getSaveFileName(
+        # Generate default filename with timestamp
+        default_filename = f"priority_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        # Use a simple input dialog instead of file dialog to avoid freezing
+        from PyQt6.QtWidgets import QInputDialog
+        
+        # Suggest some common locations
+        suggested_paths = [
+            os.path.expanduser("~/Downloads"),
+            os.path.expanduser("~/Desktop"),
+            os.path.expanduser("~/Documents"),
+            os.getcwd()
+        ]
+        
+        # Find the first accessible path as default
+        default_path = os.getcwd()
+        for path in suggested_paths:
+            if os.path.exists(path) and os.access(path, os.W_OK):
+                default_path = path
+                break
+        
+        # Ask user for folder path using simple text input
+        folder_path, ok = QInputDialog.getText(
             self,
-            "💾 Save Priority Report",
-            f"priority_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            "Excel Files (*.xlsx)"
+            "📁 Choose Export Folder",
+            f"💾 Enter folder path to save '{default_filename}':\n\n"
+            f"💡 Leave empty to use: {default_path}\n"
+            f"📂 Or enter a different folder path:",
+            text=default_path
         )
         
-        if not file_path:
+        if not ok:
+            return
+            
+        # Use default if empty
+        if not folder_path.strip():
+            folder_path = default_path
+        else:
+            folder_path = folder_path.strip()
+            
+        # Validate the folder path
+        try:
+            # Expand user path (handles ~)
+            folder_path = os.path.expanduser(folder_path)
+            
+            # Create directory if it doesn't exist
+            if not os.path.exists(folder_path):
+                reply = QMessageBox.question(
+                    self, "📁 Create Folder?", 
+                    f"Folder doesn't exist:\n{folder_path}\n\nCreate it?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    os.makedirs(folder_path, exist_ok=True)
+                else:
+                    return
+            
+            # Check if writable
+            if not os.access(folder_path, os.W_OK):
+                QMessageBox.warning(self, "❌ Permission Error", 
+                                  f"Cannot write to folder:\n{folder_path}\n\n"
+                                  f"💡 Try the Quick Export instead or choose a different folder.")
+                return
+                
+        except Exception as e:
+            QMessageBox.warning(self, "❌ Invalid Path", 
+                              f"Invalid folder path:\n{folder_path}\n\n"
+                              f"Error: {str(e)}\n\n"
+                              f"💡 Try the Quick Export instead.")
+            return
+            
+        # Create full file path
+        file_path = os.path.join(folder_path, default_filename)
+        
+        try:
+            # Show progress/working indicator
+            self.export_button.setText('⏳ Starting export...')
+            self.export_button.setEnabled(False)
+            QApplication.processEvents()  # Allow UI to update
+            
+            # Create and start worker thread
+            self.export_worker = ExcelExportWorker(self.task_list, file_path)
+            self.export_worker.finished.connect(self.on_export_finished)
+            self.export_worker.error.connect(self.on_export_error)
+            self.export_worker.progress.connect(self.on_export_progress)
+            self.export_worker.start()
+            
+        except Exception as e:
+            # Reset button state on error
+            self.export_button.setText('📁 Export to Custom Location')
+            self.export_button.setEnabled(True)
+            
+            QMessageBox.critical(self, "❌ Export Error", 
+                               f"😞 Failed to start export:\n\n{str(e)}\n\n"
+                               f"💡 Try the Quick Export instead or check file permissions.")
+
+    def on_export_finished(self, file_path):
+        # Reset button state
+        self.export_button.setText('📁 Export to Custom Location')
+        self.export_button.setEnabled(True)
+        
+        # Close progress dialog if open
+        if self.progress_dialog:
+            self.progress_dialog.close()
+            self.progress_dialog = None
+        
+        QMessageBox.information(self, "✅ Export Successful!", 
+                              f"🎉 Your priority analysis has been saved with calendar schedule!\n\n"
+                              f"📁 File location: {file_path}\n\n"
+                              f"💡 You can now share this with your team or use it for planning!")
+
+    def on_export_error(self, error_message):
+        # Reset button state
+        self.export_button.setText('📁 Export to Custom Location')
+        self.export_button.setEnabled(True)
+        
+        # Close progress dialog if open
+        if self.progress_dialog:
+            self.progress_dialog.close()
+            self.progress_dialog = None
+        
+        QMessageBox.critical(self, "❌ Export Error", 
+                           f"😞 Failed to export your data:\n\n{error_message}\n\n"
+                           f"💡 Try the Quick Export instead or check file permissions!")
+
+    def on_export_progress(self, message):
+        # Update button text with progress
+        self.export_button.setText(f"⏳ {message}")
+        QApplication.processEvents()
+
+    def quick_export_to_excel(self):
+        """Quick export method that saves directly without file dialog"""
+        if not self.task_list:
+            QMessageBox.warning(self, "❌ No Data", "There are no tasks to export!\n\n🎯 Add some tasks and prioritize them first.")
             return
             
         try:
+            # Show progress indicator
+            self.quick_export_button.setText('⏳ Creating Excel file...')
+            self.quick_export_button.setEnabled(False)
+            QApplication.processEvents()
+            
+            # Find a suitable save location
+            save_locations = [
+                os.path.expanduser("~/Downloads"),
+                os.path.expanduser("~/Desktop"),
+                os.path.expanduser("~"),
+                os.getcwd()
+            ]
+            
+            save_dir = None
+            for location in save_locations:
+                if os.path.exists(location) and os.access(location, os.W_OK):
+                    save_dir = location
+                    break
+            
+            if not save_dir:
+                save_dir = os.getcwd()  # Last resort
+            
+            # Generate filename with better naming
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"priority_analysis_{timestamp}.xlsx"
+            file_path = os.path.join(save_dir, filename)
+            
+            # Update progress
+            self.quick_export_button.setText('⏳ Preparing data...')
+            QApplication.processEvents()
+            
+            # Create workbook
             wb = Workbook()
             ws = wb.active
             ws.title = "Task Priorities"
             
-            # Add headers including calendar information
+            # Add headers
             headers = ['📋 Task', '★ Value', '⏰ Time (hours)', '🏆 Priority Score', 
                       '📅 Scheduled Date', '🕐 Start Time', '🕐 End Time']
             for col, header in enumerate(headers, 1):
                 ws.cell(row=1, column=col, value=header)
+            
+            # Update progress
+            self.quick_export_button.setText('⏳ Adding tasks...')
+            QApplication.processEvents()
             
             # Add data
             sorted_tasks = calculate_and_sort_tasks(self.task_list)
@@ -1081,7 +1340,6 @@ class PriorityPlotWidget(QWidget):
                 ws.cell(row=row, column=3, value=task.time)
                 ws.cell(row=row, column=4, value=task.score)
                 
-                # Add calendar scheduling information
                 if task.is_scheduled():
                     ws.cell(row=row, column=5, value=task.scheduled_date.strftime('%Y-%m-%d'))
                     ws.cell(row=row, column=6, value=task.scheduled_start_time if task.scheduled_start_time else "")
@@ -1091,24 +1349,42 @@ class PriorityPlotWidget(QWidget):
                     ws.cell(row=row, column=6, value="")
                     ws.cell(row=row, column=7, value="")
             
-            # Auto-adjust column widths
-            for column in ws.columns:
-                max_length = 0
-                column = [cell for cell in column]
-                for cell in column:
-                    try:
-                        if len(str(cell.value)) > max_length:
-                            max_length = len(str(cell.value))
-                    except:
-                        pass
-                adjusted_width = (max_length + 2)
-                ws.column_dimensions[column[0].column_letter].width = adjusted_width
+            # Update progress
+            self.quick_export_button.setText('⏳ Formatting...')
+            QApplication.processEvents()
             
+            # Simple column width adjustment
+            for col in range(1, 8):
+                ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = 15
+            
+            # Update progress
+            self.quick_export_button.setText('⏳ Saving file...')
+            QApplication.processEvents()
+            
+            # Save the file
             wb.save(file_path)
-            QMessageBox.information(self, "✅ Export Successful!", f"🎉 Your priority analysis has been saved with calendar schedule!\n\n📁 File location: {file_path}\n\n💡 You can now share this with your team or use it for planning.")
+            
+            # Reset button
+            self.quick_export_button.setText('📊 Export to Excel (Quick)')
+            self.quick_export_button.setEnabled(True)
+            
+            # Show success with better information
+            folder_name = os.path.basename(save_dir)
+            QMessageBox.information(self, "✅ Quick Export Successful!", 
+                                  f"🎉 Your priority analysis has been saved!\n\n"
+                                  f"📁 File: {filename}\n"
+                                  f"📂 Location: {folder_name} folder\n"
+                                  f"🔗 Full path: {file_path}\n\n"
+                                  f"💡 Your file is ready to share or open in Excel!")
             
         except Exception as e:
-            QMessageBox.critical(self, "❌ Export Error", f"😞 Failed to export your data:\n\n{str(e)}\n\n💡 Try saving to a different location or check file permissions.")
+            # Reset button
+            self.quick_export_button.setText('📊 Export to Excel (Quick)')
+            self.quick_export_button.setEnabled(True)
+            
+            QMessageBox.critical(self, "❌ Quick Export Error", 
+                               f"😞 Failed to export your data:\n\n{str(e)}\n\n"
+                               f"💡 Please check folder permissions or try the Custom Location export.")
 
     def show_help(self):
         help_text = """
