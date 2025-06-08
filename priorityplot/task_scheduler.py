@@ -76,13 +76,14 @@ class ScheduleCalendarWidget(QCalendarWidget):
         self.highlighted_date = q_date
         
         highlight_format = self.dateTextFormat(q_date)
-        highlight_format.setBackground(QColor(255, 20, 20, 255))  # Bright red
+        # Use a more vibrant highlighting color with pulsing effect
+        highlight_format.setBackground(QColor(255, 100, 100, 220))  # Bright red-orange
         highlight_format.setForeground(QColor(255, 255, 255, 255))  # White text
         
         font = highlight_format.font()
         font.setBold(True)
         font.setWeight(900)
-        font.setPointSize(font.pointSize() + 3)
+        font.setPointSize(font.pointSize() + 4)  # Make even larger
         highlight_format.setFont(font)
         
         self.setDateTextFormat(q_date, highlight_format)
@@ -94,13 +95,53 @@ class ScheduleCalendarWidget(QCalendarWidget):
                 self.original_selection = current_selection
             self.setSelectedDate(q_date)
         
+        # Add subtle animation effect with timer
+        if not hasattr(self, 'highlight_timer'):
+            self.highlight_timer = QTimer()
+            self.highlight_timer.timeout.connect(self.pulse_highlight)
+        
+        self.highlight_timer.start(300)  # Pulse every 300ms
+        self.pulse_state = 0  # Track pulse animation state
+        
         self.update()
         self.highlight_cleanup_timer.start(5000)
     
+    def pulse_highlight(self):
+        """Create a pulsing effect for the highlighted date"""
+        if not self.highlighted_date:
+            if hasattr(self, 'highlight_timer'):
+                self.highlight_timer.stop()
+            return
+        
+        # Alternate between two highlight intensities
+        self.pulse_state = (self.pulse_state + 1) % 2
+        
+        highlight_format = self.dateTextFormat(self.highlighted_date)
+        
+        if self.pulse_state == 0:
+            # Bright phase
+            highlight_format.setBackground(QColor(255, 80, 80, 240))
+        else:
+            # Dim phase
+            highlight_format.setBackground(QColor(255, 120, 120, 180))
+        
+        font = highlight_format.font()
+        font.setBold(True)
+        font.setWeight(900)
+        font.setPointSize(font.pointSize() + 4)
+        highlight_format.setFont(font)
+        highlight_format.setForeground(QColor(255, 255, 255, 255))
+        
+        self.setDateTextFormat(self.highlighted_date, highlight_format)
+        self.update()
+    
     def clear_drop_highlighting(self):
         """Clear any drag drop highlighting"""
+        # Stop timers
         if hasattr(self, 'highlight_cleanup_timer'):
             self.highlight_cleanup_timer.stop()
+        if hasattr(self, 'highlight_timer'):
+            self.highlight_timer.stop()
             
         if self.highlighted_date:
             # Clear the date format

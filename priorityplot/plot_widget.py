@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QTabWidget, QTab
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, QTimer, QDate, QTime, QMimeData, QPoint
-from PyQt6.QtGui import QClipboard, QColor, QDrag
+from PyQt6.QtGui import QClipboard, QColor, QDrag, QPixmap, QPainter, QFont, QFontMetrics
 from .model import Task, calculate_and_sort_tasks
 from .task_manager import TaskManager
 from .task_scheduler import TaskSchedulerWidget
@@ -261,7 +261,70 @@ class DraggableTableWidget(QTableWidget):
     def __init__(self, parent_widget, parent=None):
         super().__init__(parent)
         self.parent_widget = parent_widget
+        self.drag_start_row = None  # Track which row is being prepared for drag
+        
+        # Enable mouse tracking for hover effects
+        self.setMouseTracking(True)
+        
+        # Set drag drop cursor policy
+        self.setCursor(Qt.CursorShape.OpenHandCursor)
     
+    def mousePressEvent(self, event):
+        """Handle mouse press for drag preparation"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            item = self.itemAt(event.position().toPoint())
+            if item:
+                self.drag_start_row = item.row()
+                # Change cursor to indicate drag is possible
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+                # Highlight the row being prepared for drag
+                self.highlight_drag_row(self.drag_start_row)
+        
+        super().mousePressEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release to reset cursor"""
+        self.setCursor(Qt.CursorShape.OpenHandCursor)
+        self.clear_drag_highlighting()
+        self.drag_start_row = None
+        super().mouseReleaseEvent(event)
+    
+    def mouseMoveEvent(self, event):
+        """Handle mouse move for cursor changes"""
+        item = self.itemAt(event.position().toPoint())
+        if item:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+        
+        super().mouseMoveEvent(event)
+    
+    def highlight_drag_row(self, row):
+        """Highlight the row being prepared for drag"""
+        if row < 0 or row >= self.rowCount():
+            return
+            
+        for col in range(self.columnCount()):
+            item = self.item(row, col)
+            if item:
+                # Add a subtle glow effect by changing the background
+                original_bg = item.background()
+                glow_color = QColor(42, 130, 218, 100)  # Semi-transparent blue
+                item.setBackground(glow_color)
+                
+                # Store original background for restoration
+                if not hasattr(item, 'original_background'):
+                    item.original_background = original_bg
+    
+    def clear_drag_highlighting(self):
+        """Clear any drag highlighting"""
+        if self.drag_start_row is not None and self.drag_start_row < self.rowCount():
+            for col in range(self.columnCount()):
+                item = self.item(self.drag_start_row, col)
+                if item and hasattr(item, 'original_background'):
+                    item.setBackground(item.original_background)
+                    delattr(item, 'original_background')
+
     def startDrag(self, supportedActions):
         """Override to provide custom MIME data for task dragging"""
         item = self.currentItem()
@@ -287,8 +350,67 @@ class DraggableTableWidget(QTableWidget):
                     mimeData.setText(f"task_{original_index}")
                     drag.setMimeData(mimeData)
                     
+                    # Create a visual drag pixmap showing the task being dragged
+                    self.create_drag_pixmap(drag, selected_task, row)
+                    
                     # Execute drag
                     drag.exec(supportedActions)
+    
+    def create_drag_pixmap(self, drag, task, row):
+        """Create a visual representation of the task being dragged"""
+        # Get task text (truncate if too long)
+        task_text = task.task
+        if len(task_text) > 25:
+            task_text = task_text[:22] + "..."
+        
+        # Create a font for the drag pixmap
+        font = QFont("Arial", 12, QFont.Weight.Bold)
+        metrics = QFontMetrics(font)
+        
+        # Calculate pixmap size
+        text_width = metrics.horizontalAdvance(task_text)
+        text_height = metrics.height()
+        
+        # Add padding and icon space
+        padding = 12
+        icon_space = 30
+        pixmap_width = max(text_width + icon_space + padding * 2, 200)
+        pixmap_height = text_height + padding * 2
+        
+        # Create the pixmap
+        pixmap = QPixmap(pixmap_width, pixmap_height)
+        pixmap.fill(QColor(42, 130, 218, 200))  # Semi-transparent blue background
+        
+        # Create painter
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setFont(font)
+        
+        # Draw border
+        painter.setPen(QColor(255, 255, 255, 255))  # White border
+        painter.drawRoundedRect(0, 0, pixmap_width-1, pixmap_height-1, 8, 8)
+        
+        # Draw rank indicator
+        rank_text = f"#{row + 1}"
+        painter.setPen(QColor(255, 215, 0, 255))  # Gold color for rank
+        painter.drawText(padding, padding + text_height//2 + 2, rank_text)
+        
+        # Draw task text
+        painter.setPen(QColor(255, 255, 255, 255))  # White text
+        text_x = padding + icon_space
+        text_y = padding + text_height//2 + 4
+        painter.drawText(text_x, text_y, task_text)
+        
+        # Draw drag icon
+        painter.setPen(QColor(255, 255, 255, 200))
+        drag_icon = "📋"  # Clipboard icon
+        painter.drawText(pixmap_width - 25, text_y, drag_icon)
+        
+        painter.end()
+        
+        # Set the pixmap and hot spot
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(QPoint(pixmap_width // 2, pixmap_height // 2))
 
 class PriorityPlotWidget(QWidget):
     def __init__(self, task_list=None):
@@ -592,6 +714,21 @@ class PriorityPlotWidget(QWidget):
         """)
         results_layout.addWidget(live_header)
         
+        # Add drag instruction with animation hint
+        drag_instruction = QLabel("✨ Click and drag any task below to schedule it on the calendar!")
+        drag_instruction.setStyleSheet("""
+            color: #FFD700; 
+            font-weight: bold; 
+            font-size: 12px; 
+            padding: 5px 8px; 
+            background-color: #404040; 
+            border: 1px dashed #FFD700;
+            border-radius: 4px; 
+            margin-bottom: 8px;
+        """)
+        drag_instruction.setWordWrap(True)
+        results_layout.addWidget(drag_instruction)
+        
         # Compact results table with much better readability
         self.live_table = DraggableTableWidget(self)
         self.live_table.setColumnCount(4)
@@ -611,6 +748,11 @@ class PriorityPlotWidget(QWidget):
                 padding: 12px 8px;
                 border-bottom: 1px solid #555555;
                 min-height: 16px;
+            }
+            QTableWidget::item:hover {
+                background-color: #555555;
+                border: 1px solid #2a82da;
+                cursor: pointer;
             }
             QTableWidget::item:selected {
                 background-color: #2a82da;
