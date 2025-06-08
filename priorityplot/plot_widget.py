@@ -466,7 +466,7 @@ class PriorityPlotWidget(QWidget):
         calendar_layout.addWidget(calendar_header)
         
         # Instructions
-        instructions = QLabel("💡 Click a date, then drag tasks here")
+        instructions = QLabel("💡 Drag tasks directly to any day")
         instructions.setStyleSheet("color: #888888; font-size: 11px; padding: 0 10px 5px 10px; font-style: italic;")
         calendar_layout.addWidget(instructions)
         
@@ -725,10 +725,81 @@ class PriorityPlotWidget(QWidget):
 
     def get_date_at_position(self, pos):
         """Get the date at the given position in the calendar widget"""
-        # For simplicity and reliability, we'll use the currently selected date
-        # This ensures users can easily control which date they're scheduling to
-        # by clicking on the desired date first, then dragging
+        try:
+            # Get calendar dimensions and layout info
+            calendar_rect = self.calendar.rect()
+            
+            # Get the current month info
+            current_date = self.calendar.selectedDate()
+            year = current_date.year()
+            month = current_date.month()
+            
+            # Calculate the calendar grid area (excluding header with month/year)
+            # The calendar typically has a header, so we need to account for that
+            header_height = 100  # Increased to account for navigation and day headers
+            calendar_content_height = calendar_rect.height() - header_height
+            
+            # Standard calendar layout: 7 columns (days), up to 6 rows (weeks)
+            cell_width = calendar_rect.width() / 7
+            cell_height = calendar_content_height / 6
+            
+            # Calculate which cell was clicked
+            col = int(pos.x() / cell_width)
+            row = int((pos.y() - header_height) / cell_height)
+            
+            # Ensure we're within valid bounds
+            if col < 0 or col >= 7 or row < 0 or row >= 6:
+                # Outside calendar grid, use selected date
+                return datetime(current_date.year(), current_date.month(), current_date.day()).date()
+            
+            # Get the first day of the month and its weekday
+            first_day = QDate(year, month, 1)
+            first_weekday = first_day.dayOfWeek() % 7  # 0=Sunday, 1=Monday, etc.
+            
+            # Calculate the day number based on grid position
+            day_number = row * 7 + col - first_weekday + 1
+            
+            # Check if this is a valid day for the current month
+            days_in_month = first_day.daysInMonth()
+            
+            if 1 <= day_number <= days_in_month:
+                # Valid day in current month
+                target_date = QDate(year, month, day_number)
+                if target_date.isValid():
+                    return datetime(target_date.year(), target_date.month(), target_date.day()).date()
+            elif day_number <= 0:
+                # This is from the previous month
+                if month == 1:
+                    prev_month = 12
+                    prev_year = year - 1
+                else:
+                    prev_month = month - 1
+                    prev_year = year
+                
+                prev_month_days = QDate(prev_year, prev_month, 1).daysInMonth()
+                actual_day = prev_month_days + day_number
+                target_date = QDate(prev_year, prev_month, actual_day)
+                if target_date.isValid():
+                    return datetime(target_date.year(), target_date.month(), target_date.day()).date()
+            else:
+                # This is from the next month
+                if month == 12:
+                    next_month = 1
+                    next_year = year + 1
+                else:
+                    next_month = month + 1
+                    next_year = year
+                
+                actual_day = day_number - days_in_month
+                target_date = QDate(next_year, next_month, actual_day)
+                if target_date.isValid():
+                    return datetime(target_date.year(), target_date.month(), target_date.day()).date()
+                
+        except Exception:
+            # Fallback to selected date
+            pass
         
+        # Fallback to selected date if calculation fails
         current_selected = self.calendar.selectedDate()
         return datetime(current_selected.year(), current_selected.month(), current_selected.day()).date()
 
@@ -1188,9 +1259,9 @@ class PriorityPlotWidget(QWidget):
 • See live priority rankings update as you drag
 
 <b>📅 Calendar Scheduling:</b>
-• Click on the desired date in the calendar first
-• Drag any task from the priority ranking table to the calendar
-• A time selection dialog will appear - choose your preferred start and end times
+• Drag tasks from the priority ranking table directly to any day on the calendar
+• A time selection dialog will appear showing the day you dropped on
+• Choose your preferred start and end times in the dialog
 • Scheduled tasks appear in green on the chart and with 📅 in rankings
 • View scheduled tasks by clicking different calendar dates
 • Remove schedules using the "Clear Selected" button
