@@ -296,6 +296,8 @@ class PriorityPlotWidget(QWidget):
         self.drag_index = None
         self.moved_points = set()  # Track which points have been moved
         self.current_annotation = None  # Track current hover annotation
+        self.highlighted_task_index = None  # Track currently highlighted task
+        self.highlight_scatter = None  # Track highlight scatter plot element
         self.auto_update_timer = QTimer()  # Timer for real-time updates
         self.auto_update_timer.timeout.connect(self.update_priority_display)
         self.auto_update_timer.setSingleShot(True)
@@ -612,6 +614,9 @@ class PriorityPlotWidget(QWidget):
         self.live_table.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.live_table.setDefaultDropAction(Qt.DropAction.CopyAction)
         self.live_table.setToolTip("💡 Drag tasks from this table to the calendar to schedule them!")
+        
+        # Connect click event to highlight tasks
+        self.live_table.cellClicked.connect(self.on_table_cell_clicked)
         
         results_layout.addWidget(self.live_table)
         
@@ -1416,6 +1421,9 @@ class PriorityPlotWidget(QWidget):
             self.canvas.draw_idle()
 
     def update_plot(self):
+        # Clear highlighting when plot is updated
+        self.clear_task_highlighting()
+        
         self.ax.clear()
         
         # Reapply modern styling
@@ -1429,7 +1437,7 @@ class PriorityPlotWidget(QWidget):
         # Set labels with modern styling
         self.ax.set_xlabel('* Value (Impact/Importance)', color='white', fontsize=11, fontweight='bold')
         self.ax.set_ylabel('Time Investment (Hours)', color='white', fontsize=11, fontweight='bold')
-        self.ax.set_title('Interactive Priority Matrix', color='white', fontsize=13, fontweight='bold', pad=15)
+        self.ax.set_title('Interactive Priority Matrix • Click table row to highlight', color='white', fontsize=13, fontweight='bold', pad=15)
         
         # Style the ticks
         self.ax.tick_params(colors='white', which='both')
@@ -1567,6 +1575,7 @@ class PriorityPlotWidget(QWidget):
 • Left-click and drag tasks on chart to set their Value (→) and Time Investment (↑)
 • Bottom-right corner = High Value + Low Time = TOP PRIORITY!
 • See live priority rankings update as you drag
+• <b>Click any row in the priority table to highlight that task in the plot and calendar!</b>
 
 <b>📅 Calendar Scheduling:</b>
 • Drag tasks from the priority ranking table directly to any day on the calendar
@@ -1582,12 +1591,14 @@ class PriorityPlotWidget(QWidget):
 • Top 3 tasks get special numbered circles on the plot
 • Live ranking table shows your current priorities with schedule indicators
 • Export to Excel includes both priorities and calendar schedules
+• <b>Click table rows to instantly find and highlight tasks!</b>
 
 <b>💡 Pro Tips:</b>
 • Hover over plot points to see task details and priority scores
 • Color coding: Red = original, Blue = repositioned, Green = scheduled
 • Focus on high-value, low-time tasks for maximum impact
 • Schedule your top priority tasks first for better time management
+• <b>Use table row clicking to quickly locate specific tasks in your visualization</b>
 
 <b>🎨 What the Numbers Mean:</b>
 • Value (0-6): How important/impactful is this task?
@@ -1821,3 +1832,201 @@ Ready to boost your productivity? 🎯
                 f"★ Value: {value} | ⏰ Time: {time} hrs\n\n"
                 f"💡 The task is now available in your priority chart and calendar!"
             ) 
+
+    def on_table_cell_clicked(self, row, column):
+        """Handle clicking on a task in the results table to highlight it"""
+        try:
+            # Clear any previous highlighting
+            self.clear_task_highlighting()
+            
+            # Get the task index from the clicked row
+            # Since the table shows sorted tasks, we need to map back to original indices
+            for task in self.task_list:
+                task.calculate_score()
+            sorted_tasks = sorted(self.task_list, key=lambda t: t.score, reverse=True)
+            
+            if row < len(sorted_tasks):
+                # Find the original index of this task
+                selected_task = sorted_tasks[row]
+                original_index = self.task_list.index(selected_task)
+                
+                # Store the highlighted task index
+                self.highlighted_task_index = original_index
+                
+                # Highlight in the plot
+                self.highlight_task_in_plot(original_index)
+                
+                # Highlight in calendar if scheduled
+                if selected_task.is_scheduled():
+                    self.highlight_task_in_calendar(selected_task)
+                
+                # Add visual feedback to the table row
+                self.highlight_table_row(row)
+                
+                print(f"🎯 Highlighted task: {selected_task.task}")
+                
+        except Exception as e:
+            print(f"❌ Error highlighting task: {e}")
+    
+    def highlight_task_in_plot(self, task_index):
+        """Highlight a specific task in the plot"""
+        if task_index >= len(self.task_list):
+            return
+            
+        task = self.task_list[task_index]
+        
+        # Remove previous highlight scatter if it exists
+        if self.highlight_scatter:
+            self.highlight_scatter.remove()
+            self.highlight_scatter = None
+        
+        # Create a prominent highlight circle around the selected task
+        self.highlight_scatter = self.ax.scatter(
+            [task.value], [task.time],
+            s=400,  # Large size
+            facecolors='none',
+            edgecolors='#FFD700',  # Gold color
+            linewidths=4,  # Thick border
+            alpha=0.9,
+            zorder=10  # Ensure it's on top
+        )
+        
+        # Add pulsing effect with a second, slightly larger circle
+        pulse_scatter = self.ax.scatter(
+            [task.value], [task.time],
+            s=500,  # Even larger
+            facecolors='none',
+            edgecolors='#FFD700',
+            linewidths=2,
+            alpha=0.5,
+            zorder=9
+        )
+        
+        # Store both elements for cleanup
+        if not hasattr(self, 'highlight_elements'):
+            self.highlight_elements = []
+        self.highlight_elements.append(pulse_scatter)
+        
+        # Add a text label above the highlighted point
+        highlight_text = self.ax.text(
+            task.value, task.time + 0.3,
+            f"🎯 {task.task[:20]}{'...' if len(task.task) > 20 else ''}",
+            ha='center', va='bottom',
+            fontsize=10, fontweight='bold',
+            color='#FFD700',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='#2a82da', alpha=0.8),
+            zorder=11
+        )
+        self.highlight_elements.append(highlight_text)
+        
+        self.canvas.draw_idle()
+    
+    def highlight_task_in_calendar(self, task):
+        """Highlight the scheduled date of a task in the calendar"""
+        if not task.is_scheduled():
+            return
+            
+        scheduled_date = task.scheduled_date.date()
+        
+        # Navigate to the month containing the scheduled date
+        q_date = QDate(scheduled_date.year, scheduled_date.month, scheduled_date.day)
+        
+        # Set the calendar to show the correct month/year
+        self.calendar.setSelectedDate(q_date)
+        
+        # Use the existing highlighting method but with a different color for selection
+        self.calendar.highlight_date_for_drop(scheduled_date)
+        
+        # Override the color to use a selection highlight instead of drop highlight
+        selection_format = self.calendar.dateTextFormat(q_date)
+        selection_format.setBackground(QColor(42, 130, 218, 255))  # Bright blue
+        selection_format.setForeground(QColor(255, 255, 255, 255))  # White text
+        
+        # Make it bold and larger
+        font = selection_format.font()
+        font.setBold(True)
+        font.setWeight(900)
+        font.setPointSize(font.pointSize() + 2)
+        selection_format.setFont(font)
+        
+        self.calendar.setDateTextFormat(q_date, selection_format)
+        self.calendar.update()
+        
+        # Update the selected date display
+        self.update_selected_date_display()
+        
+        # Update scheduled tasks display to show tasks for this date
+        self.update_scheduled_tasks_display()
+    
+    def highlight_table_row(self, row):
+        """Add visual highlighting to the selected table row"""
+        # Clear previous row highlighting
+        for i in range(self.live_table.rowCount()):
+            for j in range(self.live_table.columnCount()):
+                item = self.live_table.item(i, j)
+                if item:
+                    # Reset to normal colors (preserve top-3 highlighting)
+                    if i == 0:  # Gold for #1
+                        item.setBackground(QColor(255, 215, 0, 150))
+                        item.setForeground(QColor(0, 0, 0))
+                    elif i == 1:  # Silver for #2
+                        item.setBackground(QColor(192, 192, 192, 150))
+                        item.setForeground(QColor(0, 0, 0))
+                    elif i == 2:  # Bronze for #3
+                        item.setBackground(QColor(205, 127, 50, 150))
+                        item.setForeground(QColor(255, 255, 255))
+                    else:
+                        item.setBackground(QColor())  # Clear background
+                        item.setForeground(QColor(255, 255, 255))  # White text
+        
+        # Highlight the selected row with a bright border effect
+        for j in range(self.live_table.columnCount()):
+            item = self.live_table.item(row, j)
+            if item:
+                # Add bright cyan highlighting for selection
+                current_bg = item.background()
+                if current_bg.color().alpha() > 0:
+                    # Preserve existing color but make it brighter
+                    color = current_bg.color()
+                    color.setAlpha(255)  # Make fully opaque
+                    item.setBackground(color)
+                else:
+                    # Add cyan highlight for non-top-3 items
+                    item.setBackground(QColor(0, 255, 255, 100))  # Bright cyan
+                
+                # Add bold border effect by making text bold and adding outline
+                font = item.font()
+                font.setBold(True)
+                font.setWeight(900)
+                item.setFont(font)
+        
+        # Select the row programmatically for additional visual feedback
+        self.live_table.selectRow(row)
+    
+    def clear_task_highlighting(self):
+        """Clear all task highlighting from plot, calendar, and table"""
+        # Clear plot highlighting
+        if self.highlight_scatter:
+            self.highlight_scatter.remove()
+            self.highlight_scatter = None
+        
+        # Clear additional highlight elements
+        if hasattr(self, 'highlight_elements'):
+            for element in self.highlight_elements:
+                try:
+                    element.remove()
+                except:
+                    pass  # Element might already be removed
+            self.highlight_elements = []
+        
+        # Clear calendar highlighting
+        self.calendar.clear_drop_highlighting()
+        
+        # Clear table selection
+        self.live_table.clearSelection()
+        
+        # Reset highlighted task index
+        self.highlighted_task_index = None
+        
+        # Redraw the plot
+        self.canvas.draw_idle() 
