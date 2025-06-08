@@ -124,7 +124,28 @@ def main():
     widget = PriorityPlotWidget()
     main_window.setCentralWidget(widget)
     main_window.setWindowTitle('priplot')
-    main_window.resize(900, 600)  # Slightly larger window for better visibility
+    
+    # Make window scalable and responsive to different screen sizes
+    # Get screen geometry to set appropriate default size
+    screen = app.primaryScreen().geometry()
+    screen_width = screen.width()
+    screen_height = screen.height()
+    
+    # Set window to 80% of screen size, but with reasonable min/max bounds
+    default_width = min(max(1000, int(screen_width * 0.8)), 1600)
+    default_height = min(max(700, int(screen_height * 0.8)), 1200)
+    
+    main_window.resize(default_width, default_height)
+    
+    # Set minimum size to ensure usability on smaller screens
+    main_window.setMinimumSize(800, 600)
+    
+    # Center the window on screen
+    main_window.move(
+        (screen_width - default_width) // 2,
+        (screen_height - default_height) // 2
+    )
+    
     main_window.show()
     sys.exit(app.exec())
 

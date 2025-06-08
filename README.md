@@ -36,13 +36,16 @@
 ### 🎯 Core Functionality
 - **Interactive Priority Plotting**: Drag tasks around the value/time matrix
 - **Smart Priority Calculation**: Automatic ranking based on value-to-time ratio
+- **Calendar Scheduling**: Drag and drop tasks to schedule them on specific dates
+- **Direct Calendar Task Creation**: Create new tasks directly from the calendar view
 - **Multi-Tab Interface**: Separate views for input, plotting, and results
 - **Hover Tooltips**: See task details without clicking
 
 ### 📊 Data Management
 - **Flexible Input**: Add tasks one by one or import from clipboard
+- **Calendar Task Creation**: Create and schedule tasks directly from the calendar
 - **Test Data Generator**: Pre-loaded sample tasks for quick testing
-- **Excel Export**: Professional spreadsheet output with priority rankings
+- **Excel Export**: Professional spreadsheet output with priority rankings and schedules
 - **Real-time Updates**: See priority changes instantly as you adjust positions
 
 ### 🎨 User Experience
@@ -138,6 +141,32 @@ python -m priorityplot.main
 1. Click "Add Test Goals" to load sample tasks
 2. Perfect for exploring the application features
 
+**Method 4: Calendar Task Creation** ✨ *NEW*
+1. Select any date on the calendar (right panel)
+2. Click the green "➕ Add Task" button
+3. Fill out the task creation dialog:
+   - **Task Name**: Enter a descriptive name
+   - **Value**: 1.0-5.0 (importance/impact) 
+   - **Time**: 0.5-8.0 (hours needed)
+   - **Start/End Times**: When you want to work on it
+4. Click OK to create and automatically schedule the task
+5. Task appears in both priority chart and calendar (bold dates show scheduled tasks)
+
+### Calendar Scheduling
+
+**Drag and Drop Scheduling**
+1. After adding tasks, drag any task from the priority ranking table
+2. Drop it onto any date in the calendar
+3. Choose your preferred start and end times in the dialog
+4. Tasks are automatically scheduled and appear in green on the chart
+
+**Calendar Features**
+- **Bold Dates**: Days with scheduled tasks appear in bold
+- **Task List**: Click any date to see tasks scheduled for that day
+- **Time Management**: Set specific start and end times for each task
+- **Visual Indicators**: Green dots on chart indicate scheduled tasks
+- **Clear Schedules**: Remove task schedules with the "Clear Selected" button
+
 ### Interactive Prioritization
 
 1. Switch to the "Plot" tab after adding tasks
@@ -152,7 +181,7 @@ python -m priorityplot.main
 
 1. Click "Apply" to generate the priority table
 2. Switch to the "Table" tab to see ranked results
-3. Click "Export to Excel" to save your prioritized task list
+3. Click "Export to Excel" to save your prioritized task list with calendar schedules
 4. Share with your team or use for planning
 
 ## 🎨 Interface Guide
