@@ -19,6 +19,12 @@ class ScheduleCalendarWidget(QCalendarWidget):
     def __init__(self, parent_widget, parent=None):
         super().__init__(parent)
         self.parent_widget = parent_widget
+        self.highlighted_date = None  # Track currently highlighted date during drag
+        
+        # Timer to clean up highlighting if drag events don't fire properly
+        self.highlight_cleanup_timer = QTimer()
+        self.highlight_cleanup_timer.setSingleShot(True)
+        self.highlight_cleanup_timer.timeout.connect(self.clear_drop_highlighting)
     
     def paintCell(self, painter, rect, date):
         """Override to paint cells with scheduled tasks in bold"""
@@ -71,6 +77,91 @@ class ScheduleCalendarWidget(QCalendarWidget):
         current = self.selectedDate()
         self.setSelectedDate(current)
         self.update()
+
+    def highlight_date_for_drop(self, target_date):
+        """Highlight a specific date during drag operations"""
+        # Clear previous highlighting
+        self.clear_drop_highlighting()
+        
+        # Convert Python date to QDate
+        if isinstance(target_date, datetime):
+            target_date = target_date.date()
+        
+        q_date = QDate(target_date.year, target_date.month, target_date.day)
+        
+        # Store the highlighted date
+        self.highlighted_date = q_date
+        
+        # Create highlighting format
+        highlight_format = self.dateTextFormat(q_date)
+        highlight_format.setBackground(QColor(255, 20, 20, 255))  # Bright red with full opacity - impossible to miss!
+        highlight_format.setForeground(QColor(255, 255, 255, 255))  # Pure white text with full opacity
+        
+        # Make it bold to stand out more
+        font = highlight_format.font()
+        font.setBold(True)
+        font.setWeight(900)  # Maximum boldness
+        font.setPointSize(font.pointSize() + 3)  # Make text much larger
+        highlight_format.setFont(font)
+        
+        # Remove underline to avoid enum issues - the bright red background should be enough!
+        # highlight_format.setUnderlineStyle(1)  # Single underline
+        # highlight_format.setUnderlineColor(QColor(255, 255, 255))  # White underline
+        
+        # Apply the highlighting
+        self.setDateTextFormat(q_date, highlight_format)
+        
+        # ALSO temporarily change the calendar selection for additional visual feedback
+        current_selection = self.selectedDate()
+        if current_selection != q_date:
+            # Store the original selection to restore later
+            if not hasattr(self, 'original_selection'):
+                self.original_selection = current_selection
+            # Change selection to the highlighted date for additional visual feedback
+            self.setSelectedDate(q_date)
+        
+        # Debug message to confirm the method is being called
+        print(f"🎯 Highlighting date: {q_date.toString()} with bright red background")
+        
+        # Force a refresh to show the highlighting immediately
+        self.update()
+        
+        # Start cleanup timer as fallback (clear after 5 seconds of inactivity)
+        self.highlight_cleanup_timer.start(5000)
+    
+    def clear_drop_highlighting(self):
+        """Clear any drag drop highlighting"""
+        # Stop the cleanup timer
+        if hasattr(self, 'highlight_cleanup_timer'):
+            self.highlight_cleanup_timer.stop()
+            
+        if self.highlighted_date:
+            print(f"🧹 Clearing highlighting for date: {self.highlighted_date.toString()}")
+            
+            # First, completely clear the date format to remove any custom styling
+            self.setDateTextFormat(self.highlighted_date, self.dateTextFormat(QDate()))
+            
+            # Then check if this date should have special formatting (scheduled tasks)
+            target_date = datetime(self.highlighted_date.year(), self.highlighted_date.month(), self.highlighted_date.day()).date()
+            if self.has_scheduled_tasks_on_date(self.highlighted_date):
+                # Apply scheduled task formatting
+                scheduled_format = self.dateTextFormat(QDate())  # Start with clean format
+                font = scheduled_format.font()
+                font.setBold(True)
+                scheduled_format.setFont(font)
+                scheduled_format.setBackground(QColor(42, 130, 218, 40))  # Blue background for scheduled
+                self.setDateTextFormat(self.highlighted_date, scheduled_format)
+            
+            # Restore original calendar selection if we changed it
+            if hasattr(self, 'original_selection'):
+                self.setSelectedDate(self.original_selection)
+                delattr(self, 'original_selection')
+            
+            self.highlighted_date = None
+            
+            # Force a complete refresh of the calendar
+            self.updateCells()
+            self.update()
 
 class TimeSelectionDialog(QDialog):
     """Dialog for selecting start and end times when scheduling a task"""
@@ -702,6 +793,7 @@ class PriorityPlotWidget(QWidget):
         self.calendar.setAcceptDrops(True)
         self.calendar.dragEnterEvent = self.calendar_drag_enter_event
         self.calendar.dragMoveEvent = self.calendar_drag_move_event
+        self.calendar.dragLeaveEvent = self.calendar_drag_leave_event
         self.calendar.dropEvent = self.calendar_drop_event
         
         # Connect calendar date change to update scheduled tasks display
@@ -732,11 +824,31 @@ class PriorityPlotWidget(QWidget):
         """Handle drag move events for the calendar"""
         if event.mimeData().hasText() and event.mimeData().text().startswith("task_"):
             event.acceptProposedAction()
+            
+            # Get the date being hovered over and highlight it
+            drop_pos = event.position()
+            hovered_date = self.get_date_at_position(drop_pos)
+            
+            if hovered_date:
+                # Only update highlighting if we're on a different date
+                q_date = QDate(hovered_date.year, hovered_date.month, hovered_date.day)
+                if not self.calendar.highlighted_date or self.calendar.highlighted_date != q_date:
+                    self.calendar.highlight_date_for_drop(hovered_date)
         else:
+            # Clear highlighting if dragging something that's not a task
+            self.calendar.clear_drop_highlighting()
             event.ignore()
+
+    def calendar_drag_leave_event(self, event):
+        """Handle drag leave events for the calendar"""
+        self.calendar.clear_drop_highlighting()
+        event.accept()  # Accept the event to ensure it's processed
 
     def calendar_drop_event(self, event):
         """Handle drop events for the calendar"""
+        # Clear highlighting first
+        self.calendar.clear_drop_highlighting()
+        
         if event.mimeData().hasText() and event.mimeData().text().startswith("task_"):
             # Extract task index from mime data
             task_index_str = event.mimeData().text().replace("task_", "")
