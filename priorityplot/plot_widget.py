@@ -537,31 +537,75 @@ class PriorityPlotWidget(QWidget):
         
         # Live results area
         results_widget = QWidget()
-        results_widget.setMaximumHeight(200)
+        results_widget.setMinimumHeight(300)  # Increased from 200px for better visibility
+        results_widget.setMaximumHeight(500)  # Allow more room to grow
         results_layout = QVBoxLayout()
         
-        # Live priority list header
+        # Live priority list header - make it more prominent
         live_header = QLabel("🏆 Live Priority Ranking (Drag to Calendar →)")
-        live_header.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; padding: 5px;")
+        live_header.setStyleSheet("""
+            color: #ffffff; 
+            font-weight: bold; 
+            font-size: 16px; 
+            padding: 8px; 
+            background-color: #2a82da; 
+            border-radius: 6px; 
+            margin-bottom: 5px;
+        """)
         results_layout.addWidget(live_header)
         
-        # Compact results table
+        # Compact results table with much better readability
         self.live_table = DraggableTableWidget(self)
         self.live_table.setColumnCount(4)
         self.live_table.setHorizontalHeaderLabels(['🏆', 'Task', 'Value', 'Score'])
+        
+        # Dramatically improved styling for better readability
         self.live_table.setStyleSheet("""
             QTableWidget {
-                font-size: 11px;
-                border-radius: 4px;
+                font-size: 14px;
+                border-radius: 6px;
+                border: 2px solid #555555;
+                background-color: #404040;
+                selection-background-color: #2a82da;
+                gridline-color: #666666;
+            }
+            QTableWidget::item {
+                padding: 12px 8px;
+                border-bottom: 1px solid #555555;
+                min-height: 16px;
+            }
+            QTableWidget::item:selected {
+                background-color: #2a82da;
+                color: white;
+                font-weight: bold;
             }
             QHeaderView::section {
-                padding: 4px;
-                font-size: 10px;
+                background-color: #555555;
+                color: white;
+                padding: 12px 8px;
+                font-size: 13px;
+                font-weight: bold;
+                border: 1px solid #666666;
+                text-align: center;
+            }
+            QHeaderView::section:hover {
+                background-color: #666666;
             }
         """)
-        # Hide row numbers and make it more compact
+        
+        # Hide row numbers and improve appearance
         self.live_table.verticalHeader().setVisible(False)
         self.live_table.setAlternatingRowColors(True)
+        self.live_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        
+        # Set optimal row height for better readability
+        self.live_table.verticalHeader().setDefaultSectionSize(35)  # Taller rows for better readability
+        
+        # Set better column widths for optimal readability
+        self.live_table.setColumnWidth(0, 50)   # Rank column - compact
+        self.live_table.setColumnWidth(1, 250)  # Task column - wider for full task names
+        self.live_table.setColumnWidth(2, 80)   # Value column 
+        self.live_table.setColumnWidth(3, 80)   # Score column
         
         # Enable drag operations
         self.live_table.setDragEnabled(True)
@@ -594,7 +638,7 @@ class PriorityPlotWidget(QWidget):
         # Add to splitter
         plot_splitter.addWidget(plot_widget)
         plot_splitter.addWidget(results_widget)
-        plot_splitter.setSizes([300, 200])  # Give more space to plot
+        plot_splitter.setSizes([250, 350])  # Give more space to results table (was 300, 200)
         
         left_layout.addWidget(plot_splitter)
         left_panel.setLayout(left_layout)
@@ -1165,41 +1209,93 @@ class PriorityPlotWidget(QWidget):
         # Sort by score
         sorted_tasks = sorted(self.task_list, key=lambda t: t.score, reverse=True)
         
-        # Update live table (show top 10)
-        display_count = min(10, len(sorted_tasks))
+        # Update live table (show all tasks, but highlight top ones)
+        display_count = min(15, len(sorted_tasks))  # Show more tasks (up to 15)
         self.live_table.setRowCount(display_count)
         
         for i, task in enumerate(sorted_tasks[:display_count]):
-            # Rank
-            rank_item = QTableWidgetItem(f"#{i+1}")
+            # Rank with special indicators for top 3
+            if i == 0:
+                rank_text = "🥇"  # Gold medal for #1
+            elif i == 1:
+                rank_text = "🥈"  # Silver medal for #2  
+            elif i == 2:
+                rank_text = "🥉"  # Bronze medal for #3
+            else:
+                rank_text = f"#{i+1}"
+                
+            rank_item = QTableWidgetItem(rank_text)
             rank_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if i < 3:  # Top 3 get special formatting
+                font = rank_item.font()
+                font.setBold(True)
+                font.setPointSize(font.pointSize() + 1)
+                rank_item.setFont(font)
             self.live_table.setItem(i, 0, rank_item)
             
-            # Task name (truncated if too long) with calendar indicator
-            task_name = task.task if len(task.task) <= 25 else task.task[:22] + "..."
+            # Task name - now show FULL name since we have more space
+            task_name = task.task  # Show full task name
             if task.is_scheduled():
-                task_name = f"📅 {task_name}"
-            self.live_table.setItem(i, 1, QTableWidgetItem(task_name))
+                task_name = f"📅 {task_name}"  # Calendar icon for scheduled tasks
             
-            # Value
-            value_item = QTableWidgetItem(f"{task.value:.1f}")
+            task_item = QTableWidgetItem(task_name)
+            task_item.setToolTip(f"Full task: {task.task}\nScheduled: {'Yes' if task.is_scheduled() else 'No'}")
+            if i < 3:  # Top 3 get bold formatting
+                font = task_item.font()
+                font.setBold(True)
+                task_item.setFont(font)
+            self.live_table.setItem(i, 1, task_item)
+            
+            # Value with better formatting
+            value_item = QTableWidgetItem(f"{task.value:.1f}⭐")
             value_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            value_item.setToolTip(f"Impact/Value rating: {task.value:.1f} out of 5.0")
+            if i < 3:
+                font = value_item.font()
+                font.setBold(True)
+                value_item.setFont(font)
             self.live_table.setItem(i, 2, value_item)
             
-            # Score
-            score_item = QTableWidgetItem(f"{task.score:.2f}")
+            # Score with color-coded priority indicators
+            score_text = f"{task.score:.2f}"
+            if task.score >= 2.0:
+                score_text = f"🔥{score_text}"  # High priority
+            elif task.score >= 1.0:
+                score_text = f"⚡{score_text}"  # Medium priority
+            else:
+                score_text = f"💡{score_text}"  # Lower priority
+                
+            score_item = QTableWidgetItem(score_text)
             score_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            score_item.setToolTip(f"Priority Score: {task.score:.2f}\nCalculated as Value({task.value:.1f}) ÷ Time({task.time:.1f})")
+            if i < 3:
+                font = score_item.font()
+                font.setBold(True)
+                score_item.setFont(font)
             self.live_table.setItem(i, 3, score_item)
             
-            # Highlight top 3
-            if i < 3:
+            # Enhanced highlighting for top 3 with gradient effect
+            if i == 0:  # Gold highlighting for #1
                 for col in range(4):
                     item = self.live_table.item(i, col)
                     if item:
-                        item.setBackground(QColor(42, 130, 218, 100))  # Light blue highlight
+                        item.setBackground(QColor(255, 215, 0, 150))  # Gold
+                        item.setForeground(QColor(0, 0, 0))  # Black text on gold
+            elif i == 1:  # Silver highlighting for #2
+                for col in range(4):
+                    item = self.live_table.item(i, col)
+                    if item:
+                        item.setBackground(QColor(192, 192, 192, 150))  # Silver
+                        item.setForeground(QColor(0, 0, 0))  # Black text on silver
+            elif i == 2:  # Bronze highlighting for #3
+                for col in range(4):
+                    item = self.live_table.item(i, col)
+                    if item:
+                        item.setBackground(QColor(205, 127, 50, 150))  # Bronze
+                        item.setForeground(QColor(255, 255, 255))  # White text on bronze
         
-        # Auto-resize columns
-        self.live_table.resizeColumnsToContents()
+        # Don't auto-resize columns since we set fixed widths for optimal readability
+        # self.live_table.resizeColumnsToContents()  # Commented out to keep our fixed widths
 
     def refresh_input_table(self):
         self.input_table.setRowCount(len(self.task_list))
