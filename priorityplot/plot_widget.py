@@ -13,6 +13,65 @@ from openpyxl import Workbook
 from datetime import datetime
 from PyQt6.QtWidgets import QApplication
 
+class ScheduleCalendarWidget(QCalendarWidget):
+    """Custom calendar widget that shows days with scheduled tasks in bold"""
+    
+    def __init__(self, parent_widget, parent=None):
+        super().__init__(parent)
+        self.parent_widget = parent_widget
+    
+    def paintCell(self, painter, rect, date):
+        """Override to paint cells with scheduled tasks in bold"""
+        # Check if this date has any scheduled tasks
+        has_tasks = self.has_scheduled_tasks_on_date(date)
+        
+        if has_tasks:
+            # Get the current text format
+            format = self.dateTextFormat(date)
+            
+            # Make it bold and change color slightly
+            font = format.font()
+            font.setBold(True)
+            format.setFont(font)
+            
+            # Optional: add a subtle background color
+            format.setBackground(QColor(42, 130, 218, 40))  # Light blue background
+            
+            # Apply the format
+            self.setDateTextFormat(date, format)
+        else:
+            # Reset to normal format
+            format = self.dateTextFormat(date)
+            font = format.font()
+            font.setBold(False)
+            format.setFont(font)
+            format.setBackground(QColor())  # Clear background
+            self.setDateTextFormat(date, format)
+        
+        # Call parent to do the actual painting
+        super().paintCell(painter, rect, date)
+    
+    def has_scheduled_tasks_on_date(self, qdate):
+        """Check if any tasks are scheduled on the given QDate"""
+        if not hasattr(self.parent_widget, 'task_list') or not self.parent_widget.task_list:
+            return False
+        
+        # Convert QDate to Python date for comparison
+        target_date = datetime(qdate.year(), qdate.month(), qdate.day()).date()
+        
+        for task in self.parent_widget.task_list:
+            if task.is_scheduled() and task.scheduled_date.date() == target_date:
+                return True
+        
+        return False
+    
+    def refresh_calendar_display(self):
+        """Force refresh of the calendar to update bold formatting"""
+        # Trigger a repaint by changing the selection slightly
+        current = self.selectedDate()
+        self.setSelectedDate(current)
+        self.update()
+
 class TimeSelectionDialog(QDialog):
     """Dialog for selecting start and end times when scheduling a task"""
     
@@ -471,7 +530,7 @@ class PriorityPlotWidget(QWidget):
         calendar_layout.addWidget(instructions)
         
         # Calendar widget
-        self.calendar = QCalendarWidget()
+        self.calendar = ScheduleCalendarWidget(self)
         self.calendar.setStyleSheet("""
             QCalendarWidget {
                 background-color: #404040;
@@ -649,8 +708,15 @@ class PriorityPlotWidget(QWidget):
         self.calendar.selectionChanged.connect(self.update_scheduled_tasks_display)
         self.calendar.selectionChanged.connect(self.update_selected_date_display)
         
+        # Connect month/year changes to refresh bold formatting
+        self.calendar.currentPageChanged.connect(self.calendar.refresh_calendar_display)
+        
         # Update the display initially
         self.update_selected_date_display()
+        
+        # Initial refresh to show any existing scheduled tasks in bold
+        if hasattr(self, 'task_list') and self.task_list:
+            self.calendar.refresh_calendar_display()
         
         calendar_widget.setLayout(calendar_layout)
         return calendar_widget
@@ -710,6 +776,9 @@ class PriorityPlotWidget(QWidget):
                             # Update the display
                             self.update_scheduled_tasks_display()
                             self.update_priority_display()
+                            
+                            # Refresh calendar to show bold formatting
+                            self.calendar.refresh_calendar_display()
                             
                             event.acceptProposedAction()
                         else:
@@ -868,6 +937,9 @@ class PriorityPlotWidget(QWidget):
                 self.task_list[task_index].clear_schedule()
                 self.update_scheduled_tasks_display()
                 self.update_priority_display()  # Refresh priority display
+                
+                # Refresh calendar to update bold formatting
+                self.calendar.refresh_calendar_display()
 
     def add_test_goals_and_proceed(self):
         """Add test goals and automatically proceed to plot view"""
@@ -1263,6 +1335,7 @@ class PriorityPlotWidget(QWidget):
 • A time selection dialog will appear showing the day you dropped on
 • Choose your preferred start and end times in the dialog
 • Scheduled tasks appear in green on the chart and with 📅 in rankings
+• Days with scheduled tasks appear in bold on the calendar
 • View scheduled tasks by clicking different calendar dates
 • Remove schedules using the "Clear Selected" button
 
