@@ -315,6 +315,8 @@ class PriorityPlotWidget(QWidget):
 
     def initUI(self):
         layout = QVBoxLayout()
+        # Reduce margins to maximize content space
+        layout.setContentsMargins(5, 5, 5, 5)
         
         # Create main splitter for side-by-side layout when tasks exist
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -514,10 +516,12 @@ class PriorityPlotWidget(QWidget):
 
     def initPlotPanel(self):
         layout = QVBoxLayout()
+        # Reduce margins to maximize content space  
+        layout.setContentsMargins(5, 0, 5, 5)
         
-        # Header with real-time priority info
+        # Header with real-time priority info - reduced padding to save space
         self.priority_header = QLabel("🎯 Drag tasks to prioritize • Drag from priority table to calendar to schedule • Top 3 priorities shown below")
-        self.priority_header.setStyleSheet("color: #ffffff; font-weight: bold; padding: 10px; font-size: 14px;")
+        self.priority_header.setStyleSheet("color: #ffffff; font-weight: bold; padding: 5px; font-size: 14px;")
         layout.addWidget(self.priority_header)
         
         # Create horizontal splitter for chart and calendar side by side
@@ -534,7 +538,8 @@ class PriorityPlotWidget(QWidget):
         plot_widget = QWidget()
         plot_layout = QVBoxLayout()
         
-        self.figure = Figure(figsize=(6, 4), facecolor='#353535')
+        # Increase figure size to better utilize available space
+        self.figure = Figure(figsize=(8, 5), facecolor='#353535')
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
         
@@ -549,7 +554,8 @@ class PriorityPlotWidget(QWidget):
         # Set labels with modern styling
         self.ax.set_xlabel('* Value (Impact/Importance)', color='white', fontsize=11, fontweight='bold')
         self.ax.set_ylabel('Time Investment (Hours)', color='white', fontsize=11, fontweight='bold')
-        self.ax.set_title('Interactive Priority Matrix', color='white', fontsize=13, fontweight='bold', pad=15)
+        # Shorter title to prevent truncation
+        self.ax.set_title('Priority Matrix', color='white', fontsize=13, fontweight='bold', pad=10)
         
         # Style the ticks
         self.ax.tick_params(colors='white', which='both')
@@ -677,7 +683,7 @@ class PriorityPlotWidget(QWidget):
         # Add to splitter
         plot_splitter.addWidget(plot_widget)
         plot_splitter.addWidget(results_widget)
-        plot_splitter.setSizes([250, 350])  # Give more space to results table (was 300, 200)
+        plot_splitter.setSizes([300, 350])  # Give more space to the plot area
         
         left_layout.addWidget(plot_splitter)
         left_panel.setLayout(left_layout)
@@ -837,7 +843,8 @@ class PriorityPlotWidget(QWidget):
         # Set labels with modern styling
         self.ax.set_xlabel('* Value (Impact/Importance)', color='white', fontsize=11, fontweight='bold')
         self.ax.set_ylabel('Time Investment (Hours)', color='white', fontsize=11, fontweight='bold')
-        self.ax.set_title('Interactive Priority Matrix • Click table row to highlight', color='white', fontsize=13, fontweight='bold', pad=15)
+        # Shorter title to prevent truncation, matching the initialization
+        self.ax.set_title('Priority Matrix • Click table row to highlight', color='white', fontsize=13, fontweight='bold', pad=10)
         
         # Style the ticks
         self.ax.tick_params(colors='white', which='both')
@@ -893,8 +900,8 @@ class PriorityPlotWidget(QWidget):
         # Update the scatter reference for event handling
         self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True, alpha=0)
         
-        # Adjust figure layout
-        self.figure.subplots_adjust(left=0.15, bottom=0.15, right=0.95, top=0.9)
+        # Adjust figure layout to prevent title truncation and better utilize space
+        self.figure.subplots_adjust(left=0.12, bottom=0.12, right=0.95, top=0.92)
         self.canvas.draw()
 
     def export_to_excel(self):
