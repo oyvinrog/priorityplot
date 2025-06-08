@@ -20,11 +20,16 @@ class ScheduleCalendarWidget(QCalendarWidget):
         super().__init__(parent)
         self.parent_widget = parent_widget
         self.highlighted_date = None  # Track currently highlighted date during drag
+        self.drag_in_progress = False  # Track if we're currently in a drag operation
         
         # Timer to clean up highlighting if drag events don't fire properly
         self.highlight_cleanup_timer = QTimer()
         self.highlight_cleanup_timer.setSingleShot(True)
         self.highlight_cleanup_timer.timeout.connect(self.clear_drop_highlighting)
+        
+        # Prevent month changes during drag operations
+        self.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        self.setNavigationBarVisible(True)  # Keep navigation visible but disable during drag
     
     def paintCell(self, painter, rect, date):
         """Override to paint cells with scheduled tasks in bold"""
@@ -816,6 +821,10 @@ class PriorityPlotWidget(QWidget):
     def calendar_drag_enter_event(self, event):
         """Handle drag enter events for the calendar"""
         if event.mimeData().hasText() and event.mimeData().text().startswith("task_"):
+            print("🎯 Drag started - entering calendar")
+            self.calendar.drag_in_progress = True
+            # Store original month to prevent navigation
+            self.calendar.original_month = self.calendar.selectedDate()
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -834,6 +843,18 @@ class PriorityPlotWidget(QWidget):
                 q_date = QDate(hovered_date.year, hovered_date.month, hovered_date.day)
                 if not self.calendar.highlighted_date or self.calendar.highlighted_date != q_date:
                     self.calendar.highlight_date_for_drop(hovered_date)
+                    
+            # Prevent month navigation by restoring original month if it changed
+            if hasattr(self.calendar, 'original_month'):
+                current_month = self.calendar.selectedDate()
+                if (current_month.year() != self.calendar.original_month.year() or 
+                    current_month.month() != self.calendar.original_month.month()):
+                    print("⚠️  Preventing month change during drag")
+                    # Don't change the month, but allow day selection within the month
+                    corrected_date = QDate(self.calendar.original_month.year(), 
+                                         self.calendar.original_month.month(), 
+                                         self.calendar.original_month.day())
+                    self.calendar.setSelectedDate(corrected_date)
         else:
             # Clear highlighting if dragging something that's not a task
             self.calendar.clear_drop_highlighting()
@@ -841,12 +862,17 @@ class PriorityPlotWidget(QWidget):
 
     def calendar_drag_leave_event(self, event):
         """Handle drag leave events for the calendar"""
+        print("🎯 Drag left calendar area")
+        self.calendar.drag_in_progress = False
         self.calendar.clear_drop_highlighting()
         event.accept()  # Accept the event to ensure it's processed
 
     def calendar_drop_event(self, event):
         """Handle drop events for the calendar"""
-        # Clear highlighting first
+        print("🎯 Drop event - cleaning up drag state")
+        
+        # Clear highlighting and drag state first
+        self.calendar.drag_in_progress = False
         self.calendar.clear_drop_highlighting()
         
         if event.mimeData().hasText() and event.mimeData().text().startswith("task_"):
@@ -905,84 +931,67 @@ class PriorityPlotWidget(QWidget):
             event.ignore()
 
     def get_date_at_position(self, pos):
-        """Get the date at the given position in the calendar widget"""
+        """Get the date at the given position in the calendar widget - improved accuracy"""
         try:
-            # Get calendar dimensions and layout info
+            # Get calendar dimensions and current state
             calendar_rect = self.calendar.rect()
-            
-            # Get the current month info
             current_date = self.calendar.selectedDate()
-            year = current_date.year()
-            month = current_date.month()
             
-            # Calculate the calendar grid area (excluding header with month/year)
-            # The calendar typically has a header, so we need to account for that
-            header_height = 100  # Increased to account for navigation and day headers
-            calendar_content_height = calendar_rect.height() - header_height
+            # Debug the position
+            print(f"🎯 Mouse position: ({pos.x():.1f}, {pos.y():.1f}) in calendar {calendar_rect.width()}x{calendar_rect.height()}")
             
-            # Standard calendar layout: 7 columns (days), up to 6 rows (weeks)
-            cell_width = calendar_rect.width() / 7
-            cell_height = calendar_content_height / 6
+            # Use a more reliable approach: try multiple header heights and see which works best
+            possible_header_heights = [60, 80, 100, 120, 140]  # Try different header heights
             
-            # Calculate which cell was clicked
-            col = int(pos.x() / cell_width)
-            row = int((pos.y() - header_height) / cell_height)
-            
-            # Ensure we're within valid bounds
-            if col < 0 or col >= 7 or row < 0 or row >= 6:
-                # Outside calendar grid, use selected date
-                return datetime(current_date.year(), current_date.month(), current_date.day()).date()
-            
-            # Get the first day of the month and its weekday
-            first_day = QDate(year, month, 1)
-            first_weekday = first_day.dayOfWeek() % 7  # 0=Sunday, 1=Monday, etc.
-            
-            # Calculate the day number based on grid position
-            day_number = row * 7 + col - first_weekday + 1
-            
-            # Check if this is a valid day for the current month
-            days_in_month = first_day.daysInMonth()
-            
-            if 1 <= day_number <= days_in_month:
-                # Valid day in current month
-                target_date = QDate(year, month, day_number)
-                if target_date.isValid():
-                    return datetime(target_date.year(), target_date.month(), target_date.day()).date()
-            elif day_number <= 0:
-                # This is from the previous month
-                if month == 1:
-                    prev_month = 12
-                    prev_year = year - 1
-                else:
-                    prev_month = month - 1
-                    prev_year = year
+            for header_height in possible_header_heights:
+                # Calculate grid parameters
+                content_height = calendar_rect.height() - header_height
+                if content_height <= 0:
+                    continue
+                    
+                cell_width = calendar_rect.width() / 7.0
+                cell_height = content_height / 6.0
                 
-                prev_month_days = QDate(prev_year, prev_month, 1).daysInMonth()
-                actual_day = prev_month_days + day_number
-                target_date = QDate(prev_year, prev_month, actual_day)
-                if target_date.isValid():
-                    return datetime(target_date.year(), target_date.month(), target_date.day()).date()
-            else:
-                # This is from the next month
-                if month == 12:
-                    next_month = 1
-                    next_year = year + 1
-                else:
-                    next_month = month + 1
-                    next_year = year
+                # Calculate grid position with more precision
+                grid_x = pos.x() / cell_width
+                grid_y = (pos.y() - header_height) / cell_height
                 
-                actual_day = day_number - days_in_month
-                target_date = QDate(next_year, next_month, actual_day)
-                if target_date.isValid():
-                    return datetime(target_date.year(), target_date.month(), target_date.day()).date()
-                
-        except Exception:
-            # Fallback to selected date
-            pass
+                # Check if we're in a reasonable grid position
+                if 0 <= grid_x <= 7 and 0 <= grid_y <= 6:
+                    col = int(grid_x)
+                    row = int(grid_y)
+                    
+                    # Get calendar layout info
+                    year = current_date.year()
+                    month = current_date.month()
+                    first_day = QDate(year, month, 1)
+                    first_weekday = first_day.dayOfWeek() % 7  # Qt: Monday=1, convert to Sunday=0
+                    
+                    # Calculate the day number
+                    day_number = row * 7 + col - first_weekday + 1
+                    days_in_month = first_day.daysInMonth()
+                    
+                    print(f"  📅 Header: {header_height}, Grid: ({col}, {row}), Day: {day_number}")
+                    
+                    # If it's a valid day in the current month, use it
+                    if 1 <= day_number <= days_in_month:
+                        target_date = QDate(year, month, day_number)
+                        if target_date.isValid():
+                            result_date = datetime(target_date.year(), target_date.month(), target_date.day()).date()
+                            print(f"  ✅ Found date: {result_date}")
+                            return result_date
+            
+            # If none of the header heights worked, fall back to a simple approach
+            print("  ⚠️  Falling back to selected date")
+            
+        except Exception as e:
+            print(f"  ❌ Error in date calculation: {e}")
         
-        # Fallback to selected date if calculation fails
+        # Fallback to current selected date
         current_selected = self.calendar.selectedDate()
-        return datetime(current_selected.year(), current_selected.month(), current_selected.day()).date()
+        fallback_date = datetime(current_selected.year(), current_selected.month(), current_selected.day()).date()
+        print(f"  🔄 Using fallback date: {fallback_date}")
+        return fallback_date
 
     def set_smart_default_times(self, dialog, date):
         """Set smart default times based on existing scheduled tasks for the date"""
