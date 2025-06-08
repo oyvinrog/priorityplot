@@ -124,7 +124,7 @@ def main():
     widget = PriorityPlotWidget()
     main_window.setCentralWidget(widget)
     main_window.setWindowTitle('priplot')
-    main_window.resize(900, 600)  # Slightly larger window for better visibility
+    main_window.resize(1200, 700)  # Larger window to accommodate calendar panel
     main_window.show()
     sys.exit(app.exec())
 
