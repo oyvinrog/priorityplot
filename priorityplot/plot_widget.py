@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QTabWidget, QTab
                              QTableWidgetItem, QLineEdit, QLabel, QHBoxLayout, QMessageBox, 
                              QFileDialog, QSplitter, QFrame, QCalendarWidget, QTimeEdit, 
                              QListWidget, QListWidgetItem, QGroupBox, QFormLayout, QAbstractItemView,
-                             QDialog, QDialogButtonBox)
+                             QDialog, QDialogButtonBox, QHeaderView)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, QTimer, QDate, QTime, QMimeData, QPoint
@@ -412,7 +412,7 @@ class PriorityPlotWidget(QWidget):
         self.task_input = QLineEdit()
         self.task_input.setPlaceholderText("Type a task and press Enter...")
         self.task_input.setToolTip("💡 Type a task name and press Enter to add it quickly!")
-        self.task_input.returnPressed.connect(self.add_task_and_auto_proceed)
+        self.task_input.returnPressed.connect(self.add_task_only)
         self.task_input.setStyleSheet("""
             QLineEdit {
                 padding: 12px;
@@ -428,7 +428,7 @@ class PriorityPlotWidget(QWidget):
         
         # Add button (less prominent since Enter is preferred)
         self.add_button = QPushButton("➕ Add Task")
-        self.add_button.clicked.connect(self.add_task_and_auto_proceed)
+        self.add_button.clicked.connect(self.add_task_only)
         self.add_button.setStyleSheet("""
             QPushButton {
                 background-color: #6c757d;
@@ -460,6 +460,30 @@ class PriorityPlotWidget(QWidget):
             }
         """)
         layout.addWidget(self.input_table)
+        
+        # Show Results button (appears when tasks are added)
+        self.show_results_button = QPushButton("🎯 Show Priority Chart & Calendar")
+        self.show_results_button.clicked.connect(self.proceed_to_plot)
+        self.show_results_button.setToolTip("💡 Ready to prioritize? Click to see your interactive chart and calendar!")
+        self.show_results_button.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 12px;
+                border-radius: 6px;
+                margin: 15px 0px;
+            }
+            QPushButton:hover {
+                background-color: #34ce57;
+            }
+            QPushButton:pressed {
+                background-color: #1e7e34;
+            }
+        """)
+        layout.addWidget(self.show_results_button)
+        self.show_results_button.hide()  # Initially hidden until tasks are added
         
         # Help button (smaller, less prominent)
         help_button = QPushButton("❓ Help")
@@ -603,11 +627,15 @@ class PriorityPlotWidget(QWidget):
         # Set optimal row height for better readability
         self.live_table.verticalHeader().setDefaultSectionSize(35)  # Taller rows for better readability
         
-        # Set better column widths for optimal readability
-        self.live_table.setColumnWidth(0, 50)   # Rank column - compact
-        self.live_table.setColumnWidth(1, 250)  # Task column - wider for full task names
-        self.live_table.setColumnWidth(2, 80)   # Value column 
-        self.live_table.setColumnWidth(3, 80)   # Score column
+        # Set better column widths for optimal readability and scalability
+        header = self.live_table.horizontalHeader()
+        header.setStretchLastSection(True)  # Make last column stretch
+        
+        # Use proportional widths instead of fixed widths for better scaling
+        self.live_table.setColumnWidth(0, 60)   # Rank column - compact but readable
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Task column - stretches with window
+        self.live_table.setColumnWidth(2, 90)   # Value column - proportional
+        self.live_table.setColumnWidth(3, 90)   # Score column - proportional
         
         # Enable drag operations
         self.live_table.setDragEnabled(True)
@@ -654,7 +682,12 @@ class PriorityPlotWidget(QWidget):
         # Add both panels to main splitter
         main_splitter.addWidget(left_panel)
         main_splitter.addWidget(calendar_panel)
-        main_splitter.setSizes([600, 400])  # Give more space to chart initially
+        
+        # Make the splitter more responsive - give more space to chart but allow calendar to scale
+        # These ratios will work better for different screen sizes
+        main_splitter.setSizes([2, 1])  # 2:1 ratio - chart gets 2/3, calendar gets 1/3
+        main_splitter.setStretchFactor(0, 2)  # Chart area can stretch more
+        main_splitter.setStretchFactor(1, 1)  # Calendar area can stretch less
         
         layout.addWidget(main_splitter)
         self.plot_panel.setLayout(layout)
@@ -1133,7 +1166,7 @@ class PriorityPlotWidget(QWidget):
                 self.calendar.refresh_calendar_display()
 
     def add_test_goals_and_proceed(self):
-        """Add test goals and automatically proceed to plot view"""
+        """Add test goals and show the results button"""
         test_goals = [
             ("Complete Project Proposal", 4.5, 3.0),
             ("Review Code Changes", 3.0, 2.0),
@@ -1161,10 +1194,15 @@ class PriorityPlotWidget(QWidget):
             self.task_list.append(Task(task_name, value, time))
         
         self.refresh_input_table()
-        self.proceed_to_plot()
+        
+        # Show the results button and give user control
+        self.show_results_button.show()
+        
+        # Update placeholder to encourage viewing results
+        self.task_input.setPlaceholderText("20 sample tasks added! Click 'Show Results' to prioritize.")
 
     def add_goals_from_clipboard_and_proceed(self):
-        """Add goals from clipboard and automatically proceed if successful"""
+        """Add goals from clipboard and show the results button"""
         clipboard = QApplication.clipboard()
         text = clipboard.text().strip()
         
@@ -1183,11 +1221,39 @@ class PriorityPlotWidget(QWidget):
             
         self.refresh_input_table()
         
-        # Auto-proceed if we have a reasonable number of tasks
+        # Show the results button and let user decide when to proceed
+        self.show_results_button.show()
+        
+        # Update placeholder based on number of tasks
         if len(goals) >= 3:
-            self.proceed_to_plot()
+            self.task_input.setPlaceholderText(f"{len(goals)} tasks added! Click 'Show Results' to prioritize.")
         else:
-            QMessageBox.information(self, "✅ Tasks Added!", f"Added {len(goals)} tasks. Add more or click a task to start prioritizing!")
+            self.task_input.setPlaceholderText(f"{len(goals)} tasks added. Add more or click 'Show Results'.")
+            
+        QMessageBox.information(self, "✅ Tasks Added!", f"Added {len(goals)} tasks from clipboard.\n\n💡 Click 'Show Results' when ready to prioritize!")
+
+    def add_task_only(self):
+        """Add a task without automatically proceeding to plot"""
+        task = self.task_input.text().strip()
+        if not task:
+            QMessageBox.warning(self, "⚠️ Input Required", "🎯 Please enter a task name first!")
+            return
+        
+        self.task_list.append(Task(task, 3.0, 4.0))  # Default to middle of our ranges
+        self.task_input.clear()
+        self.refresh_input_table()
+        
+        # Show the results button if we have tasks
+        if len(self.task_list) >= 1:
+            self.show_results_button.show()
+            
+        # Update placeholder text to encourage more tasks
+        if len(self.task_list) == 1:
+            self.task_input.setPlaceholderText("Great! Add more tasks or click 'Show Results'...")
+        elif len(self.task_list) >= 3:
+            self.task_input.setPlaceholderText("Ready to prioritize? Click 'Show Results' below!")
+        else:
+            self.task_input.setPlaceholderText("Add another task...")
 
     def add_task_and_auto_proceed(self):
         """Add a task and auto-proceed to plot if we have enough tasks"""
@@ -1212,16 +1278,18 @@ class PriorityPlotWidget(QWidget):
         if not self.task_list:
             return
             
-        # Show both panels
+        # Show the plot panel
         self.plot_panel.show()
-        self.main_splitter.setSizes([350, 650])  # Give more space to plot
+        
+        # Completely hide the input panel once we have tasks and are showing results
+        self.input_panel.hide()
+        
+        # Give full space to the plot panel
+        self.main_splitter.setSizes([0, 1000])  # Hide input completely, give all space to plot
         
         # Update plot and live results
         self.update_plot()
         self.update_priority_display()
-        
-        # Minimize input panel after a moment (optional)
-        QTimer.singleShot(2000, lambda: self.main_splitter.setSizes([250, 750]))
 
     def update_priority_display(self):
         """Update the live priority ranking table"""
@@ -1566,12 +1634,13 @@ class PriorityPlotWidget(QWidget):
 🎯 <b>Welcome to PriPlot - Your Task Priority Assistant!</b>
 
 <b>🚀 Quick Start Options:</b>
-• "🧪 Try Sample Tasks" - Instantly explore with 20 realistic work tasks
+• "🧪 Try Sample Tasks" - Instantly add 20 realistic work tasks
 • "📋 Import List" - Paste tasks from your clipboard (one per line)
 • Type manually and press Enter to add tasks one by one
+• <b>Click "Show Results" when ready to see your priority chart and calendar</b>
 
 <b>📊 Interactive Prioritization:</b>
-• Once you have 3+ tasks, the plot automatically appears
+• Add as many tasks as you want, then click "Show Results" to see the plot
 • Left-click and drag tasks on chart to set their Value (→) and Time Investment (↑)
 • Bottom-right corner = High Value + Low Time = TOP PRIORITY!
 • See live priority rankings update as you drag
@@ -1594,6 +1663,7 @@ class PriorityPlotWidget(QWidget):
 • <b>Click table rows to instantly find and highlight tasks!</b>
 
 <b>💡 Pro Tips:</b>
+• Add all your tasks first, then click "Show Results" for full control
 • Hover over plot points to see task details and priority scores
 • Color coding: Red = original, Blue = repositioned, Green = scheduled
 • Focus on high-value, low-time tasks for maximum impact
@@ -1630,14 +1700,14 @@ Happy prioritizing and scheduling! 🚀📅
 
 Transform your task management with smart priority visualization!
 
-<b>🚀 New Streamlined Experience:</b>
+<b>🚀 New User-Controlled Experience:</b>
 • Choose "🧪 Try Sample Tasks" for instant exploration
 • Or "📋 Import List" to paste your own tasks
-• Add 3+ tasks and the plot appears automatically
-• See live priority updates as you drag tasks around
+• Add tasks manually with the input field
+• <b>Click "Show Results" when you're ready to prioritize!</b>
 
-<b>💡 No more clicking through tabs!</b>
-Everything flows naturally as you work. The interface adapts to show you exactly what you need, when you need it.
+<b>💡 You're in control!</b>
+Add as many tasks as you want, then click the green "Show Results" button when you're ready to see your priority chart and calendar.
 
 Ready to boost your productivity? 🎯
         """
