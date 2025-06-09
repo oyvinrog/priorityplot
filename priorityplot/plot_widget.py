@@ -7,11 +7,12 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, QTimer, QDate, QTime, QMimeData, QPoint, QThread, pyqtSignal
 from PyQt6.QtGui import QClipboard, QColor, QDrag, QPixmap, QPainter, QFont, QFontMetrics
-from .model import Task, calculate_and_sort_tasks
+from .model import (Task, calculate_and_sort_tasks, TaskConstants, TaskStateManager, 
+                   TaskDisplayFormatter, TaskValidator, SampleDataGenerator, ExcelExporter,
+                   get_top_tasks, get_task_colors)
 from .task_manager import TaskManager
 from .task_scheduler import TaskSchedulerWidget
 import numpy as np
-from openpyxl import Workbook
 from datetime import datetime
 from PyQt6.QtWidgets import QApplication
 import os
@@ -32,51 +33,14 @@ class ExcelExportWorker(QThread):
         try:
             self.progress.emit("Creating Excel workbook...")
             
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Task Priorities"
+            # Use the centralized exporter
+            success = ExcelExporter.export_tasks_to_excel(self.task_list, self.file_path)
             
-            self.progress.emit("Adding headers...")
-            
-            # Add headers including calendar information
-            headers = ['📋 Task', '★ Value', '⏰ Time (hours)', '🏆 Priority Score', 
-                      '📅 Scheduled Date', '🕐 Start Time', '🕐 End Time']
-            for col, header in enumerate(headers, 1):
-                ws.cell(row=1, column=col, value=header)
-            
-            self.progress.emit("Processing task data...")
-            
-            # Add data
-            sorted_tasks = calculate_and_sort_tasks(self.task_list)
-            for row, task in enumerate(sorted_tasks, 2):
-                ws.cell(row=row, column=1, value=task.task)
-                ws.cell(row=row, column=2, value=task.value)
-                ws.cell(row=row, column=3, value=task.time)
-                ws.cell(row=row, column=4, value=task.score)
-                
-                # Add calendar scheduling information
-                if task.is_scheduled():
-                    ws.cell(row=row, column=5, value=task.scheduled_date.strftime('%Y-%m-%d'))
-                    ws.cell(row=row, column=6, value=task.scheduled_start_time if task.scheduled_start_time else "")
-                    ws.cell(row=row, column=7, value=task.scheduled_end_time if task.scheduled_end_time else "")
-                else:
-                    ws.cell(row=row, column=5, value="Not scheduled")
-                    ws.cell(row=row, column=6, value="")
-                    ws.cell(row=row, column=7, value="")
-            
-            self.progress.emit("Formatting columns...")
-            
-            # Simple column width adjustment to avoid complexity
-            for col in range(1, 8):
-                ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = 15
-            
-            self.progress.emit("Saving file...")
-            
-            # Save the file
-            wb.save(self.file_path)
-            
-            self.progress.emit("Export completed!")
-            self.finished.emit(self.file_path)
+            if success:
+                self.progress.emit("Export completed!")
+                self.finished.emit(self.file_path)
+            else:
+                self.error.emit("Failed to export tasks to Excel")
             
         except Exception as e:
             self.error.emit(str(e))
@@ -486,11 +450,12 @@ class PriorityPlotWidget(QWidget):
         # Add task manager for better abstraction and modular design
         self.task_manager = TaskManager(self.task_list)
         
+        # Use centralized state management
+        self.state_manager = TaskStateManager()
+        
         self.dragging = False
         self.drag_index = None
-        self.moved_points = set()  # Track which points have been moved
         self.current_annotation = None  # Track current hover annotation
-        self.highlighted_task_index = None  # Track currently highlighted task
         self.highlight_scatter = None  # Track highlight scatter plot element
         self.auto_update_timer = QTimer()  # Timer for real-time updates
         self.auto_update_timer.timeout.connect(self.update_priority_display)
@@ -991,9 +956,9 @@ class PriorityPlotWidget(QWidget):
             return
         
         # Update task values
-        self.task_list[self.drag_index].value = max(0, min(6, event.xdata))  # Clamp to valid range
-        self.task_list[self.drag_index].time = max(0, min(8, event.ydata))   # Clamp to valid range
-        self.moved_points.add(self.drag_index)  # Mark this point as moved
+        self.task_list[self.drag_index].value = max(0, min(TaskConstants.MAX_VALUE, event.xdata))  # Use constants
+        self.task_list[self.drag_index].time = max(0, min(TaskConstants.MAX_TIME, event.ydata))   # Use constants
+        self.state_manager.mark_task_moved(self.drag_index)  # Use state manager
         
         # Update scatter plot data directly for smooth movement
         x_data = [t.value for t in self.task_list]
@@ -1089,31 +1054,23 @@ class PriorityPlotWidget(QWidget):
         # Style the ticks
         self.ax.tick_params(colors='white', which='both')
         
-        # Maintain fixed axis limits
-        self.ax.set_xlim(0, 6)
-        self.ax.set_ylim(0, 8)
+        # Maintain fixed axis limits using constants
+        self.ax.set_xlim(0, TaskConstants.MAX_VALUE)
+        self.ax.set_ylim(0, TaskConstants.MAX_TIME)
         
         # Create arrays for all points
         x_data = [t.value for t in self.task_list]
         y_data = [t.time for t in self.task_list]
         
-        # Calculate scores and find the top 3 tasks
-        for task in self.task_list:
-            task.calculate_score()
+        # Get top 3 tasks using model function
+        top_3_tasks = get_top_tasks(self.task_list, 3)
+        top_3_indices = []
+        for task in top_3_tasks:
+            if task in self.task_list:
+                top_3_indices.append(self.task_list.index(task))
         
-        # Get indices sorted by score (highest first)
-        sorted_indices = sorted(range(len(self.task_list)), key=lambda i: self.task_list[i].score, reverse=True)
-        top_3_indices = sorted_indices[:3]  # Get top 3 tasks
-        
-        # Create color array based on whether points have been moved and scheduled
-        colors = []
-        for i in range(len(self.task_list)):
-            if self.task_list[i].is_scheduled():
-                colors.append('#28a745')  # Green for scheduled tasks
-            elif i in self.moved_points:
-                colors.append('#2a82da')  # Blue for moved but unscheduled
-            else:
-                colors.append('#e74c3c')  # Red for original position unscheduled
+        # Get colors using model function
+        colors = get_task_colors(self.task_list, self.state_manager.moved_points)
         
         # Create scatter plot for all points except the top 3
         non_top_indices = [i for i in range(len(self.task_list)) if i not in top_3_indices]
@@ -1291,91 +1248,35 @@ class PriorityPlotWidget(QWidget):
             self.quick_export_button.setEnabled(False)
             QApplication.processEvents()
             
-            # Find a suitable save location
-            save_locations = [
-                os.path.expanduser("~/Downloads"),
-                os.path.expanduser("~/Desktop"),
-                os.path.expanduser("~"),
-                os.getcwd()
-            ]
-            
-            save_dir = None
-            for location in save_locations:
-                if os.path.exists(location) and os.access(location, os.W_OK):
-                    save_dir = location
-                    break
-            
-            if not save_dir:
-                save_dir = os.getcwd()  # Last resort
-            
-            # Generate filename with better naming
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"priority_analysis_{timestamp}.xlsx"
+            # Use model functions for export
+            save_dir = ExcelExporter.get_default_export_path()
+            filename = ExcelExporter.generate_filename()
             file_path = os.path.join(save_dir, filename)
             
             # Update progress
-            self.quick_export_button.setText('⏳ Preparing data...')
+            self.quick_export_button.setText('⏳ Exporting...')
             QApplication.processEvents()
             
-            # Create workbook
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Task Priorities"
-            
-            # Add headers
-            headers = ['📋 Task', '★ Value', '⏰ Time (hours)', '🏆 Priority Score', 
-                      '📅 Scheduled Date', '🕐 Start Time', '🕐 End Time']
-            for col, header in enumerate(headers, 1):
-                ws.cell(row=1, column=col, value=header)
-            
-            # Update progress
-            self.quick_export_button.setText('⏳ Adding tasks...')
-            QApplication.processEvents()
-            
-            # Add data
-            sorted_tasks = calculate_and_sort_tasks(self.task_list)
-            for row, task in enumerate(sorted_tasks, 2):
-                ws.cell(row=row, column=1, value=task.task)
-                ws.cell(row=row, column=2, value=task.value)
-                ws.cell(row=row, column=3, value=task.time)
-                ws.cell(row=row, column=4, value=task.score)
-                
-                if task.is_scheduled():
-                    ws.cell(row=row, column=5, value=task.scheduled_date.strftime('%Y-%m-%d'))
-                    ws.cell(row=row, column=6, value=task.scheduled_start_time if task.scheduled_start_time else "")
-                    ws.cell(row=row, column=7, value=task.scheduled_end_time if task.scheduled_end_time else "")
-                else:
-                    ws.cell(row=row, column=5, value="Not scheduled")
-                    ws.cell(row=row, column=6, value="")
-                    ws.cell(row=row, column=7, value="")
-            
-            # Update progress
-            self.quick_export_button.setText('⏳ Formatting...')
-            QApplication.processEvents()
-            
-            # Simple column width adjustment
-            for col in range(1, 8):
-                ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = 15
-            
-            # Update progress
-            self.quick_export_button.setText('⏳ Saving file...')
-            QApplication.processEvents()
-            
-            # Save the file
-            wb.save(file_path)
+            # Use centralized export functionality
+            success = ExcelExporter.export_tasks_to_excel(self.task_list, file_path)
             
             # Reset button
             self.quick_export_button.setText('📊 Export to Excel (Quick)')
             self.quick_export_button.setEnabled(True)
             
-            # Show success with better information
-            folder_name = os.path.basename(save_dir)
-            QMessageBox.information(self, "✅ Quick Export Successful!", 
-                                  f"🎉 Your priority analysis has been saved!\n\n"
-                                  f"📁 File: {filename}\n"
-                                  f"📂 Location: {folder_name} folder\n"
-                                  f"🔗 Full path: {file_path}\n\n"
-                                  f"💡 Your file is ready to share or open in Excel!")
+            if success:
+                # Show success with better information
+                folder_name = os.path.basename(save_dir)
+                QMessageBox.information(self, "✅ Quick Export Successful!", 
+                                      f"🎉 Your priority analysis has been saved!\n\n"
+                                      f"📁 File: {filename}\n"
+                                      f"📂 Location: {folder_name} folder\n"
+                                      f"🔗 Full path: {file_path}\n\n"
+                                      f"💡 Your file is ready to share or open in Excel!")
+            else:
+                QMessageBox.critical(self, "❌ Quick Export Error", 
+                                   f"😞 Failed to export your data.\n\n"
+                                   f"💡 Please check folder permissions or try the Custom Location export.")
             
         except Exception as e:
             # Reset button
@@ -1528,8 +1429,8 @@ Ready to boost your productivity? 🎯
         if hasattr(self, 'live_table'):
             self.live_table.clearSelection()
         
-        # Reset highlighted task index
-        self.highlighted_task_index = None
+        # Use state manager for highlighting
+        self.state_manager.clear_highlighting()
         
         # Redraw the plot
         if hasattr(self, 'canvas'):
@@ -1552,8 +1453,8 @@ Ready to boost your productivity? 🎯
                 selected_task = sorted_tasks[row]
                 original_index = self.task_list.index(selected_task)
                 
-                # Store the highlighted task index
-                self.highlighted_task_index = original_index
+                # Use state manager for highlighting
+                self.state_manager.set_highlighted_task(original_index)
                 
                 # Highlight in the plot
                 self.highlight_task_in_plot(original_index)
@@ -1670,31 +1571,9 @@ Ready to boost your productivity? 🎯
 
     def add_test_goals_and_proceed(self):
         """Add test goals and show the results button"""
-        test_goals = [
-            ("Complete Project Proposal", 4.5, 3.0),
-            ("Review Code Changes", 3.0, 2.0),
-            ("Team Meeting", 2.5, 1.5),
-            ("Update Documentation", 3.5, 4.0),
-            ("Bug Fixing", 4.0, 2.5),
-            ("Client Presentation", 5.0, 4.0),
-            ("Code Refactoring", 3.5, 5.0),
-            ("Unit Testing", 4.0, 3.0),
-            ("Performance Optimization", 4.5, 6.0),
-            ("Security Audit", 5.0, 4.5),
-            ("Database Migration", 4.0, 7.0),
-            ("API Integration", 3.5, 3.5),
-            ("User Training", 3.0, 2.0),
-            ("System Backup", 2.5, 1.0),
-            ("Deployment Planning", 4.0, 2.0),
-            ("Code Review", 3.5, 1.5),
-            ("Feature Implementation", 4.5, 5.0),
-            ("Technical Documentation", 3.0, 4.0),
-            ("Bug Triage", 3.5, 2.0),
-            ("System Monitoring", 2.5, 1.5)
-        ]
-        
-        for task_name, value, time in test_goals:
-            self.task_list.append(Task(task_name, value, time))
+        # Use sample data generator from model
+        sample_tasks = SampleDataGenerator.get_sample_tasks()
+        self.task_list.extend(sample_tasks)
         
         self.refresh_input_table()
         
@@ -1712,51 +1591,56 @@ Ready to boost your productivity? 🎯
         if not text:
             QMessageBox.warning(self, "📋 Clipboard Empty", "❌ No text found in clipboard!\n\n💡 Copy a list of tasks (one per line) and try again.")
             return
-            
-        goals = [goal.strip() for goal in text.split('\n') if goal.strip()]
         
-        if not goals:
+        # Use sample data generator from model
+        new_tasks = SampleDataGenerator.create_tasks_from_text(text)
+        
+        if not new_tasks:
             QMessageBox.warning(self, "❌ No Valid Tasks", "The clipboard text doesn't contain valid tasks.\n\n💡 Make sure each task is on a separate line!")
             return
             
-        for goal in goals:
-            self.task_list.append(Task(goal, 3.0, 4.0))  # Default to middle of our ranges
-            
+        self.task_list.extend(new_tasks)
         self.refresh_input_table()
         
         # Show the results button and let user decide when to proceed
         self.show_results_button.show()
         
         # Update placeholder based on number of tasks
-        if len(goals) >= 3:
-            self.task_input.setPlaceholderText(f"{len(goals)} tasks added! Click 'Show Results' to prioritize.")
+        if len(new_tasks) >= 3:
+            self.task_input.setPlaceholderText(f"{len(new_tasks)} tasks added! Click 'Show Results' to prioritize.")
         else:
-            self.task_input.setPlaceholderText(f"{len(goals)} tasks added. Add more or click 'Show Results'.")
+            self.task_input.setPlaceholderText(f"{len(new_tasks)} tasks added. Add more or click 'Show Results'.")
             
-        QMessageBox.information(self, "✅ Tasks Added!", f"Added {len(goals)} tasks from clipboard.\n\n💡 Click 'Show Results' when ready to prioritize!")
+        QMessageBox.information(self, "✅ Tasks Added!", f"Added {len(new_tasks)} tasks from clipboard.\n\n💡 Click 'Show Results' when ready to prioritize!")
 
     def add_task_only(self):
         """Add a task without automatically proceeding to plot"""
-        task = self.task_input.text().strip()
-        if not task:
+        task_name = self.task_input.text().strip()
+        if not task_name:
             QMessageBox.warning(self, "⚠️ Input Required", "🎯 Please enter a task name first!")
             return
         
-        self.task_list.append(Task(task, 3.0, 4.0))  # Default to middle of our ranges
-        self.task_input.clear()
-        self.refresh_input_table()
-        
-        # Show the results button if we have tasks
-        if len(self.task_list) >= 1:
-            self.show_results_button.show()
+        try:
+            # Use validator to create task with defaults
+            new_task = TaskValidator.create_validated_task(task_name)
+            self.task_list.append(new_task)
+            self.task_input.clear()
+            self.refresh_input_table()
             
-        # Update placeholder text to encourage more tasks
-        if len(self.task_list) == 1:
-            self.task_input.setPlaceholderText("Great! Add more tasks or click 'Show Results'...")
-        elif len(self.task_list) >= 3:
-            self.task_input.setPlaceholderText("Ready to prioritize? Click 'Show Results' below!")
-        else:
-            self.task_input.setPlaceholderText("Add another task...")
+            # Show the results button if we have tasks
+            if len(self.task_list) >= 1:
+                self.show_results_button.show()
+                
+            # Update placeholder text to encourage more tasks
+            if len(self.task_list) == 1:
+                self.task_input.setPlaceholderText("Great! Add more tasks or click 'Show Results'...")
+            elif len(self.task_list) >= 3:
+                self.task_input.setPlaceholderText("Ready to prioritize? Click 'Show Results' below!")
+            else:
+                self.task_input.setPlaceholderText("Add another task...")
+                
+        except ValueError as e:
+            QMessageBox.warning(self, "❌ Invalid Task", f"Could not create task:\n\n{str(e)}")
 
     def proceed_to_plot(self):
         """Smoothly transition to the plot view"""
@@ -1789,19 +1673,12 @@ Ready to boost your productivity? 🎯
         sorted_tasks = sorted(self.task_list, key=lambda t: t.score, reverse=True)
         
         # Update live table (show all tasks, but highlight top ones)
-        display_count = min(15, len(sorted_tasks))  # Show more tasks (up to 15)
+        display_count = min(TaskConstants.MAX_DISPLAY_TASKS, len(sorted_tasks))  # Use constant
         self.live_table.setRowCount(display_count)
         
         for i, task in enumerate(sorted_tasks[:display_count]):
-            # Rank with special indicators for top 3
-            if i == 0:
-                rank_text = "🥇"  # Gold medal for #1
-            elif i == 1:
-                rank_text = "🥈"  # Silver medal for #2  
-            elif i == 2:
-                rank_text = "🥉"  # Bronze medal for #3
-            else:
-                rank_text = f"#{i+1}"
+            # Use formatter for rank
+            rank_text = TaskDisplayFormatter.format_rank(i + 1)
                 
             rank_item = QTableWidgetItem(rank_text)
             rank_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1812,39 +1689,29 @@ Ready to boost your productivity? 🎯
                 rank_item.setFont(font)
             self.live_table.setItem(i, 0, rank_item)
             
-            # Task name - now show FULL name since we have more space
-            task_name = task.task  # Show full task name
-            if task.is_scheduled():
-                task_name = f"📅 {task_name}"  # Calendar icon for scheduled tasks
+            # Use formatter for task name
+            task_name = TaskDisplayFormatter.format_task_name(task)
             
             task_item = QTableWidgetItem(task_name)
-            task_item.setToolTip(f"Full task: {task.task}\nScheduled: {'Yes' if task.is_scheduled() else 'No'}")
+            task_item.setToolTip(TaskDisplayFormatter.get_tooltip_text(task))  # Use formatter for tooltip
             if i < 3:  # Top 3 get bold formatting
                 font = task_item.font()
                 font.setBold(True)
                 task_item.setFont(font)
             self.live_table.setItem(i, 1, task_item)
             
-            # Value with better formatting
-            value_item = QTableWidgetItem(f"{task.value:.1f}⭐")
+            # Use formatter for value
+            value_item = QTableWidgetItem(TaskDisplayFormatter.format_value(task.value))
             value_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            value_item.setToolTip(f"Impact/Value rating: {task.value:.1f} out of 5.0")
+            value_item.setToolTip(f"Impact/Value rating: {task.value:.1f} out of {TaskConstants.MAX_VALUE:.1f}")
             if i < 3:
                 font = value_item.font()
                 font.setBold(True)
                 value_item.setFont(font)
             self.live_table.setItem(i, 2, value_item)
             
-            # Score with color-coded priority indicators
-            score_text = f"{task.score:.2f}"
-            if task.score >= 2.0:
-                score_text = f"🔥{score_text}"  # High priority
-            elif task.score >= 1.0:
-                score_text = f"⚡{score_text}"  # Medium priority
-            else:
-                score_text = f"💡{score_text}"  # Lower priority
-                
-            score_item = QTableWidgetItem(score_text)
+            # Use formatter for score
+            score_item = QTableWidgetItem(TaskDisplayFormatter.format_priority_score(task.score))
             score_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             score_item.setToolTip(f"Priority Score: {task.score:.2f}\nCalculated as Value({task.value:.1f}) ÷ Time({task.time:.1f})")
             if i < 3:

@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QGroupBox, QFormLayou
 from PyQt6.QtCore import Qt, QTimer, QDate, QTime, pyqtSignal
 from PyQt6.QtGui import QColor
 from datetime import datetime
-from .model import Task
+from .model import Task, TaskValidator
 
 
 class ScheduleCalendarWidget(QCalendarWidget):
@@ -720,15 +720,16 @@ class TaskSchedulerWidget(QWidget):
     def add_task_from_calendar(self):
         """Add a new task directly from the calendar view"""
         selected_date = self.calendar.selectedDate()
-        selected_date_str = selected_date.toString("dddd, MMMM d, yyyy")
+        selected_datetime = datetime(selected_date.year(), selected_date.month(), selected_date.day())
+        selected_date_str = selected_datetime.strftime('%A, %B %d, %Y')
         
-        # Create task creation dialog
+        # Create dialog for task input
         dialog = QDialog(self)
-        dialog.setWindowTitle(f"➕ Add Task for {selected_date_str}")
+        dialog.setWindowTitle(f"📅 Add Task for {selected_date_str}")
         dialog.setModal(True)
         dialog.resize(400, 300)
         
-        # Apply dark theme
+        # Apply styling
         dialog.setStyleSheet("""
             QDialog {
                 background-color: #353535;
@@ -743,11 +744,16 @@ class TaskSchedulerWidget(QWidget):
                 color: white;
                 border: 1px solid #666666;
                 border-radius: 4px;
-                padding: 8px;
+                padding: 6px;
                 font-size: 12px;
             }
-            QLineEdit:focus {
-                border: 2px solid #2a82da;
+            QTimeEdit {
+                background-color: #555555;
+                color: white;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 12px;
             }
             QPushButton {
                 background-color: #2a82da;
@@ -763,14 +769,6 @@ class TaskSchedulerWidget(QWidget):
             }
             QPushButton:pressed {
                 background-color: #1a72ca;
-            }
-            QTimeEdit {
-                background-color: #555555;
-                color: white;
-                border: 1px solid #666666;
-                border-radius: 4px;
-                padding: 6px;
-                font-size: 12px;
             }
         """)
         
@@ -830,41 +828,46 @@ class TaskSchedulerWidget(QWidget):
                 value = float(value_input.text())
                 time = float(time_input.text())
                 
-                if value < 0 or value > 5:
-                    raise ValueError("Value must be between 0 and 5")
-                if time <= 0 or time > 10:
-                    raise ValueError("Time must be between 0.1 and 10 hours")
+                # Use TaskValidator for validation
+                if not TaskValidator.validate_value(value):
+                    raise ValueError(f"Value must be between {TaskValidator.get_default_values()[0]} and 6.0")
+                if not TaskValidator.validate_time(time):
+                    raise ValueError(f"Time must be between 0.1 and 8.0 hours")
                     
             except ValueError as e:
                 QMessageBox.warning(self, "❌ Invalid Input", f"Please enter valid numbers:\n\n{str(e)}")
                 return
             
-            # Create and schedule new task
-            new_task = Task(task_name, value, time)
-            
-            selected_datetime = datetime.combine(
-                datetime(selected_date.year(), selected_date.month(), selected_date.day()).date(),
-                datetime.min.time()
-            )
-            
-            start_time_str = start_time.time().toString("hh:mm AP")
-            end_time_str = end_time.time().toString("hh:mm AP")
-            
-            new_task.schedule_on_calendar(selected_datetime, start_time_str, end_time_str)
-            
-            # Add to task manager and update displays
-            self.task_manager.add_task(new_task)
-            self.update_scheduled_tasks_display()
-            self.calendar.refresh_calendar_display()
-            self.task_scheduled.emit(new_task)
-            
-            QMessageBox.information(
-                self, 
-                "✅ Task Created!", 
-                f"🎉 Created and scheduled '{task_name}' for {selected_date_str}\n\n"
-                f"⏰ Time: {start_time_str} - {end_time_str}\n"
-                f"★ Value: {value} | ⏰ Time: {time} hrs"
-            )
+            # Create and schedule new task using TaskValidator
+            try:
+                new_task = TaskValidator.create_validated_task(task_name, value, time)
+                
+                selected_datetime = datetime.combine(
+                    datetime(selected_date.year(), selected_date.month(), selected_date.day()).date(),
+                    datetime.min.time()
+                )
+                
+                start_time_str = start_time.time().toString("hh:mm AP")
+                end_time_str = end_time.time().toString("hh:mm AP")
+                
+                new_task.schedule_on_calendar(selected_datetime, start_time_str, end_time_str)
+                
+                # Add to task manager and update displays
+                self.task_manager.add_task(new_task)
+                self.update_scheduled_tasks_display()
+                self.calendar.refresh_calendar_display()
+                self.task_scheduled.emit(new_task)
+                
+                QMessageBox.information(
+                    self, 
+                    "✅ Task Created!", 
+                    f"🎉 Created and scheduled '{task_name}' for {selected_date_str}\n\n"
+                    f"⏰ Time: {start_time_str} - {end_time_str}\n"
+                    f"★ Value: {value} | ⏰ Time: {time} hrs"
+                )
+                
+            except ValueError as e:
+                QMessageBox.warning(self, "❌ Task Creation Failed", f"Could not create task:\n\n{str(e)}")
     
     def highlight_task_in_calendar(self, task):
         """Highlight the scheduled date of a task in the calendar"""
