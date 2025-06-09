@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![PriPlot Screenshot](https://github.com/oyvinrog/priorityplot/raw/main/img/priplot.png)
+![PriPlot Screenshot](https://github.com/oyvinrog/priorityplot/raw/main/img/demo.gif)
 
 [![PyPI version](https://badge.fury.io/py/priorityplot.svg)](https://badge.fury.io/py/priorityplot)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
