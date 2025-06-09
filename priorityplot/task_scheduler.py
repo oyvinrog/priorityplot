@@ -66,7 +66,7 @@ class ScheduleCalendarWidget(QCalendarWidget):
         self.update()
 
     def highlight_date_for_drop(self, target_date):
-        """Highlight a specific date during drag operations"""
+        """Highlight a specific date during drag operations with enhanced animation"""
         self.clear_drop_highlighting()
         
         if isinstance(target_date, datetime):
@@ -76,14 +76,14 @@ class ScheduleCalendarWidget(QCalendarWidget):
         self.highlighted_date = q_date
         
         highlight_format = self.dateTextFormat(q_date)
-        # Use a more vibrant highlighting color with pulsing effect
-        highlight_format.setBackground(QColor(255, 100, 100, 220))  # Bright red-orange
+        # Use enhanced highlighting with better colors
+        highlight_format.setBackground(QColor(255, 100, 100, 240))  # Bright red-orange with high opacity
         highlight_format.setForeground(QColor(255, 255, 255, 255))  # White text
         
         font = highlight_format.font()
         font.setBold(True)
         font.setWeight(900)
-        font.setPointSize(font.pointSize() + 4)  # Make even larger
+        font.setPointSize(font.pointSize() + 5)  # Even larger font
         highlight_format.setFont(font)
         
         self.setDateTextFormat(q_date, highlight_format)
@@ -95,44 +95,49 @@ class ScheduleCalendarWidget(QCalendarWidget):
                 self.original_selection = current_selection
             self.setSelectedDate(q_date)
         
-        # Add subtle animation effect with timer
+        # Enhanced animation effect with improved timing
         if not hasattr(self, 'highlight_timer'):
             self.highlight_timer = QTimer()
             self.highlight_timer.timeout.connect(self.pulse_highlight)
         
-        self.highlight_timer.start(300)  # Pulse every 300ms
+        self.highlight_timer.start(180)  # Faster pulse for better responsiveness
         self.pulse_state = 0  # Track pulse animation state
         
+        print(f"🎯 Enhanced calendar highlighting for {q_date.toString()} - Drop target ready!")
+        
         self.update()
-        self.highlight_cleanup_timer.start(5000)
+        self.highlight_cleanup_timer.start(8000)  # Longer timeout
     
     def pulse_highlight(self):
-        """Create a pulsing effect for the highlighted date"""
-        if not self.highlighted_date:
+        """Enhanced pulse highlight animation"""
+        if not hasattr(self, 'highlighted_date') or not self.highlighted_date:
             if hasattr(self, 'highlight_timer'):
                 self.highlight_timer.stop()
             return
         
-        # Alternate between two highlight intensities
-        self.pulse_state = (self.pulse_state + 1) % 2
+        self.pulse_state = (self.pulse_state + 1) % 6  # 6 states for smoother animation
+        
+        # More sophisticated color animation
+        base_colors = [
+            QColor(255, 100, 100, 240),  # Red
+            QColor(255, 130, 100, 220),  # Red-orange
+            QColor(255, 160, 100, 200),  # Orange
+            QColor(255, 180, 100, 220),  # Light orange
+            QColor(255, 140, 100, 240),  # Back to red-orange
+            QColor(255, 110, 100, 250)   # Bright red
+        ]
         
         highlight_format = self.dateTextFormat(self.highlighted_date)
+        highlight_format.setBackground(base_colors[self.pulse_state])
         
-        if self.pulse_state == 0:
-            # Bright phase
-            highlight_format.setBackground(QColor(255, 80, 80, 240))
-        else:
-            # Dim phase
-            highlight_format.setBackground(QColor(255, 120, 120, 180))
-        
+        # Also pulse the font size slightly
         font = highlight_format.font()
-        font.setBold(True)
-        font.setWeight(900)
-        font.setPointSize(font.pointSize() + 4)
+        size_offset = [5, 6, 7, 6, 5, 4][self.pulse_state]
+        font.setPointSize(font.pointSize() - font.pointSize() % 10 + size_offset)
         highlight_format.setFont(font)
-        highlight_format.setForeground(QColor(255, 255, 255, 255))
         
         self.setDateTextFormat(self.highlighted_date, highlight_format)
+        self.updateCells()
         self.update()
     
     def clear_drop_highlighting(self):
@@ -522,6 +527,7 @@ class TaskSchedulerWidget(QWidget):
             
             if hovered_date:
                 q_date = QDate(hovered_date.year, hovered_date.month, hovered_date.day)
+                # Only update highlighting if we moved to a different date
                 if not self.calendar.highlighted_date or self.calendar.highlighted_date != q_date:
                     self.calendar.highlight_date_for_drop(hovered_date)
                     
@@ -598,12 +604,13 @@ class TaskSchedulerWidget(QWidget):
             event.ignore()
     
     def get_date_at_position(self, pos):
-        """Get the date at the given position in the calendar widget"""
+        """Get the date at the given position in the calendar widget with improved accuracy"""
         try:
             calendar_rect = self.calendar.rect()
             current_date = self.calendar.selectedDate()
             
-            possible_header_heights = [60, 80, 100, 120, 140]
+            # Use multiple header height possibilities for better accuracy
+            possible_header_heights = [50, 60, 70, 80, 90, 100, 110, 120]
             
             for header_height in possible_header_heights:
                 content_height = calendar_rect.height() - header_height
@@ -616,7 +623,7 @@ class TaskSchedulerWidget(QWidget):
                 grid_x = pos.x() / cell_width
                 grid_y = (pos.y() - header_height) / cell_height
                 
-                if 0 <= grid_x <= 7 and 0 <= grid_y <= 6:
+                if 0 <= grid_x < 7 and 0 <= grid_y < 6:
                     col = int(grid_x)
                     row = int(grid_y)
                     
@@ -634,7 +641,7 @@ class TaskSchedulerWidget(QWidget):
                             return datetime(target_date.year(), target_date.month(), target_date.day()).date()
             
         except Exception as e:
-            pass
+            print(f"❌ Error detecting date at position: {e}")
         
         # Fallback to current selected date
         current_selected = self.calendar.selectedDate()

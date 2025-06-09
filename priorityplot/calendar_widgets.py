@@ -167,71 +167,6 @@ class EnhancedCalendarWidget(QCalendarWidget):
         self.setSelectedDate(current)
         self.update()
     
-    def highlight_date_for_drop(self, date: datetime) -> None:
-        """Implementation of ICalendarWidget interface"""
-        self.clear_drop_highlighting()
-        
-        # Convert to QDate
-        if isinstance(date, datetime):
-            date = date.date()
-        
-        q_date = QDate(date.year, date.month, date.day)
-        self._highlighted_date = q_date
-        
-        # Create bright highlighting
-        highlight_format = self.dateTextFormat(q_date)
-        highlight_format.setBackground(QColor(255, 20, 20, 255))  # Bright red
-        highlight_format.setForeground(QColor(255, 255, 255, 255))  # White text
-        
-        # Make it bold and larger
-        font = highlight_format.font()
-        font.setBold(True)
-        font.setWeight(900)
-        font.setPointSize(font.pointSize() + 3)
-        highlight_format.setFont(font)
-        
-        self.setDateTextFormat(q_date, highlight_format)
-        
-        # Store original selection
-        if not hasattr(self, 'original_selection'):
-            self.original_selection = self.selectedDate()
-        self.setSelectedDate(q_date)
-        
-        print(f"🎯 Highlighting date: {q_date.toString()} with bright red background")
-        self.update()
-        
-        # Start cleanup timer
-        self.highlight_cleanup_timer.start(5000)
-    
-    def clear_drop_highlighting(self) -> None:
-        """Implementation of ICalendarWidget interface"""
-        if hasattr(self, 'highlight_cleanup_timer'):
-            self.highlight_cleanup_timer.stop()
-            
-        if self._highlighted_date:
-            print(f"🧹 Clearing highlighting for date: {self._highlighted_date.toString()}")
-            
-            # Clear formatting
-            self.setDateTextFormat(self._highlighted_date, self.dateTextFormat(QDate()))
-            
-            # Restore scheduled task formatting if needed
-            if self._has_scheduled_tasks_on_date(self._highlighted_date):
-                scheduled_format = self.dateTextFormat(QDate())
-                font = scheduled_format.font()
-                font.setBold(True)
-                scheduled_format.setFont(font)
-                scheduled_format.setBackground(QColor(42, 130, 218, 40))
-                self.setDateTextFormat(self._highlighted_date, scheduled_format)
-            
-            # Restore original selection
-            if hasattr(self, 'original_selection'):
-                self.setSelectedDate(self.original_selection)
-                delattr(self, 'original_selection')
-            
-            self._highlighted_date = None
-            self.updateCells()
-            self.update()
-    
     def dragEnterEvent(self, event: QDragEnterEvent):
         """Handle drag enter events"""
         if event.mimeData().hasText() and event.mimeData().text().startswith("task_"):
@@ -244,18 +179,67 @@ class EnhancedCalendarWidget(QCalendarWidget):
     def dragMoveEvent(self, event):
         """Handle drag move events over calendar"""
         if self._drag_in_progress and event.mimeData().hasText():
-            # Get the date under cursor
+            # Get the date under cursor with improved accuracy
             pos = event.position().toPoint()
+            drop_date = self._get_date_at_position(pos)
             
-            # Try to find which date is under the cursor
-            # This is a simplified approach - you might need more sophisticated hit testing
-            current_date = self.selectedDate()
-            drop_date = datetime(current_date.year(), current_date.month(), current_date.day())
-            
-            # Highlight the date
-            self.highlight_date_for_drop(drop_date)
+            if drop_date:
+                # Only update highlighting if we moved to a different date
+                target_qdate = QDate(drop_date.year, drop_date.month, drop_date.day)
+                if not self._highlighted_date or self._highlighted_date != target_qdate:
+                    self.highlight_date_for_drop(drop_date)
             
             event.acceptProposedAction()
+    
+    def _get_date_at_position(self, pos):
+        """Improved date detection at cursor position"""
+        try:
+            # Get calendar widget dimensions
+            calendar_rect = self.rect()
+            current_date = self.selectedDate()
+            
+            # Account for different possible header heights
+            possible_header_heights = [50, 60, 70, 80, 90, 100]
+            
+            for header_height in possible_header_heights:
+                content_height = calendar_rect.height() - header_height
+                if content_height <= 0:
+                    continue
+                    
+                # Calculate cell dimensions
+                cell_width = calendar_rect.width() / 7.0
+                cell_height = content_height / 6.0
+                
+                # Convert position to grid coordinates
+                grid_x = pos.x() / cell_width
+                grid_y = (pos.y() - header_height) / cell_height
+                
+                # Check if position is within the calendar grid
+                if 0 <= grid_x < 7 and 0 <= grid_y < 6:
+                    col = int(grid_x)
+                    row = int(grid_y)
+                    
+                    # Calculate the actual date
+                    year = current_date.year()
+                    month = current_date.month()
+                    first_day = QDate(year, month, 1)
+                    first_weekday = first_day.dayOfWeek() % 7  # Monday = 1, Sunday = 0
+                    
+                    day_number = row * 7 + col - first_weekday + 1
+                    days_in_month = first_day.daysInMonth()
+                    
+                    # Ensure day is valid for the current month
+                    if 1 <= day_number <= days_in_month:
+                        target_date = QDate(year, month, day_number)
+                        if target_date.isValid():
+                            return datetime(target_date.year(), target_date.month(), target_date.day())
+            
+        except Exception as e:
+            print(f"❌ Error detecting date at position: {e}")
+        
+        # Fallback to currently selected date
+        current_selected = self.selectedDate()
+        return datetime(current_selected.year(), current_selected.month(), current_selected.day())
     
     def dropEvent(self, event: QDropEvent):
         """Handle drop events on calendar"""
@@ -306,6 +290,115 @@ class EnhancedCalendarWidget(QCalendarWidget):
         """Update the task list reference"""
         self._task_list = task_list
         self.refresh_calendar_display()
+    
+    def highlight_date_for_drop(self, date: datetime) -> None:
+        """Implementation of ICalendarWidget interface with enhanced visuals"""
+        self.clear_drop_highlighting()
+        
+        # Convert to QDate
+        if isinstance(date, datetime):
+            date = date.date()
+        
+        q_date = QDate(date.year, date.month, date.day)
+        self._highlighted_date = q_date
+        
+        # Create enhanced highlighting with gradient effect
+        highlight_format = self.dateTextFormat(q_date)
+        
+        # Use bright, animated highlighting
+        highlight_format.setBackground(QColor(255, 100, 100, 240))  # Bright red with high opacity
+        highlight_format.setForeground(QColor(255, 255, 255, 255))  # White text
+        
+        # Enhanced font styling
+        font = highlight_format.font()
+        font.setBold(True)
+        font.setWeight(900)
+        font.setPointSize(font.pointSize() + 4)
+        highlight_format.setFont(font)
+        
+        self.setDateTextFormat(q_date, highlight_format)
+        
+        # Store original selection for restoration
+        if not hasattr(self, 'original_selection'):
+            self.original_selection = self.selectedDate()
+        
+        # Temporarily select the highlighted date for better visual feedback
+        self.setSelectedDate(q_date)
+        
+        # Start pulsing animation
+        if not hasattr(self, 'pulse_timer'):
+            self.pulse_timer = QTimer()
+            self.pulse_timer.timeout.connect(self._pulse_animation)
+        
+        self.pulse_state = 0
+        self.pulse_timer.start(200)  # Pulse every 200ms
+        
+        print(f"🎯 Enhanced highlighting for date: {q_date.toString()} - Ready for drop!")
+        
+        # Force immediate update
+        self.updateCells()
+        self.update()
+        
+        # Start cleanup timer
+        self.highlight_cleanup_timer.start(8000)  # Longer timeout for better UX
+    
+    def _pulse_animation(self):
+        """Create pulsing animation effect for highlighted date"""
+        if not self._highlighted_date:
+            if hasattr(self, 'pulse_timer'):
+                self.pulse_timer.stop()
+            return
+        
+        self.pulse_state = (self.pulse_state + 1) % 4
+        
+        # Vary the highlighting intensity for pulsing effect
+        alpha_values = [240, 200, 160, 200]  # Pulsing alpha values
+        colors = [
+            QColor(255, 100, 100, alpha_values[self.pulse_state]),
+            QColor(255, 150, 100, alpha_values[self.pulse_state]),
+            QColor(255, 200, 100, alpha_values[self.pulse_state]),
+            QColor(255, 150, 100, alpha_values[self.pulse_state])
+        ]
+        
+        highlight_format = self.dateTextFormat(self._highlighted_date)
+        highlight_format.setBackground(colors[self.pulse_state])
+        self.setDateTextFormat(self._highlighted_date, highlight_format)
+        
+        self.updateCells()
+        self.update()
+    
+    def clear_drop_highlighting(self) -> None:
+        """Implementation of ICalendarWidget interface with cleanup"""
+        # Stop timers
+        if hasattr(self, 'highlight_cleanup_timer'):
+            self.highlight_cleanup_timer.stop()
+        if hasattr(self, 'pulse_timer'):
+            self.pulse_timer.stop()
+            
+        if self._highlighted_date:
+            print(f"🧹 Clearing enhanced highlighting for date: {self._highlighted_date.toString()}")
+            
+            # Clear formatting completely first
+            default_format = self.dateTextFormat(QDate())
+            self.setDateTextFormat(self._highlighted_date, default_format)
+            
+            # Restore scheduled task formatting if needed
+            if self._has_scheduled_tasks_on_date(self._highlighted_date):
+                scheduled_format = self.dateTextFormat(QDate())
+                font = scheduled_format.font()
+                font.setBold(True)
+                scheduled_format.setFont(font)
+                scheduled_format.setBackground(QColor(42, 130, 218, 60))  # Light blue background
+                self.setDateTextFormat(self._highlighted_date, scheduled_format)
+            
+            # Restore original selection
+            if hasattr(self, 'original_selection'):
+                self.setSelectedDate(self.original_selection)
+                delattr(self, 'original_selection')
+            
+            self._highlighted_date = None
+            self.updateCells()
+            self.update()
 
 class ScheduledTasksList(QListWidget):
     """Single responsibility: Display scheduled tasks for selected date following SRP"""

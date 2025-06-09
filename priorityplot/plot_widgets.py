@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, 
                              QTableWidgetItem, QLabel, QMessageBox, QAbstractItemView, 
-                             QHeaderView, QInputDialog, QSplitter)
+                             QHeaderView, QInputDialog, QSplitter, QApplication)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThread, QPoint, QMimeData
-from PyQt6.QtGui import QColor, QFont, QDrag, QPixmap, QPainter, QFontMetrics
+from PyQt6.QtGui import QColor, QFont, QDrag, QPixmap, QPainter, QFontMetrics, QCursor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
@@ -20,6 +20,7 @@ class InteractivePlotWidget(QWidget):
     
     task_moved = pyqtSignal(int, float, float)  # task_index, value, time
     task_selected = pyqtSignal(int)  # task_index
+    task_drag_started = pyqtSignal(int, str)  # task index, task data for external drops
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -34,6 +35,10 @@ class InteractivePlotWidget(QWidget):
         self.current_annotation = None
         self.highlight_scatter = None
         self.highlight_elements = []
+        self.drag_threshold = 5  # pixels before starting drag
+        self.initial_click_pos = None
+        self.is_external_drag = False
+        self.drag_preview_annotation = None
         
     def _setup_plot(self):
         layout = QVBoxLayout()
@@ -219,14 +224,83 @@ class InteractivePlotWidget(QWidget):
         if contains:
             task_index = ind["ind"][0]
             if event.button == 1:  # Left mouse button
-                self.dragging = True
+                self.initial_click_pos = (event.x, event.y)
                 self.drag_index = task_index
                 self.task_selected.emit(task_index)
     
     def _on_motion(self, event):
-        if not self.dragging or self.drag_index is None or event.inaxes != self.ax:
+        if self.drag_index is None:
             return
+            
+        # Check if we should start dragging
+        if not self.dragging and self.initial_click_pos:
+            current_pos = (event.x, event.y)
+            distance = ((current_pos[0] - self.initial_click_pos[0])**2 + 
+                       (current_pos[1] - self.initial_click_pos[1])**2)**0.5
+            
+            if distance > self.drag_threshold:
+                self._start_drag(event)
+                return
         
+        if not self.dragging:
+            return
+            
+        # Check if we're dragging outside the plot area for external drop
+        if event.inaxes != self.ax:
+            if not self.is_external_drag:
+                self._start_external_drag(event)
+            return
+        else:
+            if self.is_external_drag:
+                self._end_external_drag()
+        
+        # Normal internal dragging within plot
+        if event.inaxes == self.ax:
+            self._handle_internal_drag(event)
+    
+    def _start_drag(self, event):
+        """Start the drag operation with enhanced visual feedback"""
+        self.dragging = True
+        task = self._tasks[self.drag_index]
+        
+        # Create drag preview annotation
+        self.drag_preview_annotation = self.ax.annotate(
+            f"🎯 Dragging: {task.task[:20]}{'...' if len(task.task) > 20 else ''}",
+            xy=(task.value, task.time),
+            xytext=(10, -30),
+            textcoords='offset points',
+            bbox=dict(
+                boxstyle='round,pad=0.5',
+                facecolor='#FFD700',
+                edgecolor='#FF6B35',
+                alpha=0.9,
+                linewidth=2
+            ),
+            color='#000000',
+            fontsize=10,
+            fontweight='bold',
+            zorder=20,
+            arrowprops=dict(
+                arrowstyle='->',
+                connectionstyle='arc3,rad=0.1',
+                color='#FF6B35',
+                linewidth=2
+            )
+        )
+        
+        # Add pulsing highlight to the dragged point
+        self.highlight_scatter = self.ax.scatter(
+            [task.value], [task.time],
+            s=600, facecolors='none',
+            edgecolors='#FFD700', linewidths=6,
+            alpha=0.8, zorder=15,
+            animated=True
+        )
+        
+        self.canvas.draw_idle()
+    
+    def _handle_internal_drag(self, event):
+        """Handle dragging within the plot area"""
         # Update task values
         new_value = max(0, min(TaskConstants.MAX_VALUE, event.xdata))
         new_time = max(0, min(TaskConstants.MAX_TIME, event.ydata))
@@ -240,26 +314,176 @@ class InteractivePlotWidget(QWidget):
         y_data = [t.time for t in self._tasks]
         self.scatter.set_offsets(np.column_stack([x_data, y_data]))
         
-        # Update annotation position
-        for i, annotation in enumerate(self.ax.texts):
-            if i == self.drag_index:
-                annotation.set_position((event.xdata, event.ydata))
+        # Update highlight position
+        if self.highlight_scatter:
+            self.highlight_scatter.set_offsets([[new_value, new_time]])
+        
+        # Update drag preview annotation position
+        if self.drag_preview_annotation:
+            self.drag_preview_annotation.xy = (new_value, new_time)
         
         self.canvas.draw_idle()
         
         # Trigger update with delay
         self.auto_update_timer.start(100)
     
-    def _on_release(self, event):
-        if self.dragging and self.drag_index is not None:
-            # Emit final update
-            task = self._tasks[self.drag_index]
-            self.task_moved.emit(self.drag_index, task.value, task.time)
-            # Full redraw
-            self.update_plot(self._tasks)
+    def _start_external_drag(self, event):
+        """Start external drag operation for dropping outside the plot"""
+        if self.is_external_drag:
+            return
+            
+        self.is_external_drag = True
+        task = self._tasks[self.drag_index]
         
+        # Change cursor to indicate external drag
+        QApplication.setOverrideCursor(QCursor(Qt.CursorShape.DragMoveCursor))
+        
+        # Update drag preview to indicate external drag
+        if self.drag_preview_annotation:
+            self.drag_preview_annotation.set_text(
+                f"📅 Drop to schedule: {task.task[:15]}{'...' if len(task.task) > 15 else ''}"
+            )
+            self.drag_preview_annotation.get_bbox_patch().set_facecolor('#00FF7F')
+            self.drag_preview_annotation.get_bbox_patch().set_edgecolor('#00CC66')
+            self.drag_preview_annotation.set_color('#000000')
+        
+        # Create and start Qt drag operation
+        drag = QDrag(self)
+        mime_data = QMimeData()
+        mime_data.setText(f"task_{self.drag_index}")
+        drag.setMimeData(mime_data)
+        
+        # Create drag pixmap for visual feedback
+        drag_pixmap = self._create_drag_pixmap(task)
+        drag.setPixmap(drag_pixmap)
+        drag.setHotSpot(QPoint(drag_pixmap.width() // 2, drag_pixmap.height() // 2))
+        
+        # Emit signal for external drag
+        self.task_drag_started.emit(self.drag_index, f"task_{self.drag_index}")
+        
+        self.canvas.draw_idle()
+        
+        # Execute the drag operation asynchronously
+        QTimer.singleShot(0, lambda: self._execute_drag(drag))
+    
+    def _execute_drag(self, drag):
+        """Execute the Qt drag operation"""
+        try:
+            result = drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction)
+            print(f"🎯 Drag operation completed with result: {result}")
+        except Exception as e:
+            print(f"❌ Error during drag operation: {e}")
+        finally:
+            self._cleanup_drag()
+    
+    def _end_external_drag(self):
+        """End external drag and return to internal drag mode"""
+        if not self.is_external_drag:
+            return
+            
+        self.is_external_drag = False
+        QApplication.restoreOverrideCursor()
+        
+        # Update drag preview back to internal mode
+        if self.drag_preview_annotation:
+            task = self._tasks[self.drag_index]
+            self.drag_preview_annotation.set_text(
+                f"🎯 Dragging: {task.task[:20]}{'...' if len(task.task) > 20 else ''}"
+            )
+            self.drag_preview_annotation.get_bbox_patch().set_facecolor('#FFD700')
+            self.drag_preview_annotation.get_bbox_patch().set_edgecolor('#FF6B35')
+            self.drag_preview_annotation.set_color('#000000')
+        
+        self.canvas.draw_idle()
+    
+    def _create_drag_pixmap(self, task):
+        """Create a visual pixmap for the drag operation"""
+        task_text = task.task
+        if len(task_text) > 25:
+            task_text = task_text[:22] + "..."
+        
+        font = QFont("Arial", 11, QFont.Weight.Bold)
+        metrics = QFontMetrics(font)
+        
+        text_width = metrics.horizontalAdvance(task_text)
+        text_height = metrics.height()
+        
+        padding = 15
+        icon_space = 35
+        pixmap_width = max(text_width + icon_space + padding * 2, 220)
+        pixmap_height = text_height + padding * 2 + 10
+        
+        pixmap = QPixmap(pixmap_width, pixmap_height)
+        pixmap.fill(QColor(0, 255, 127, 220))  # Semi-transparent green
+        
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setFont(font)
+        
+        # Draw border with rounded corners
+        painter.setPen(QColor(0, 204, 102, 255))
+        painter.setBrush(QColor(0, 255, 127, 180))
+        painter.drawRoundedRect(2, 2, pixmap_width-4, pixmap_height-4, 10, 10)
+        
+        # Draw calendar icon
+        painter.setPen(QColor(0, 100, 50, 255))
+        painter.drawText(padding, padding + text_height//2 + 5, "📅")
+        
+        # Draw task text
+        painter.setPen(QColor(0, 50, 25, 255))
+        text_x = padding + icon_space
+        text_y = padding + text_height//2 + 5
+        painter.drawText(text_x, text_y, task_text)
+        
+        # Draw value and time info
+        painter.setPen(QColor(0, 100, 50, 200))
+        info_text = f"★{task.value:.1f} ⏰{task.time:.1f}h"
+        painter.drawText(text_x, text_y + 15, info_text)
+        
+        painter.end()
+        
+        return pixmap
+    
+    def _on_release(self, event):
+        """Handle mouse release events"""
+        self._cleanup_drag()
+    
+    def _cleanup_drag(self):
+        """Clean up after drag operation"""
+        # Restore cursor
+        QApplication.restoreOverrideCursor()
+        
+        if self.dragging and self.drag_index is not None:
+            # Emit final update for internal drags
+            if not self.is_external_drag and self.drag_index < len(self._tasks):
+                task = self._tasks[self.drag_index]
+                self.task_moved.emit(self.drag_index, task.value, task.time)
+                # Full redraw
+                self.update_plot(self._tasks)
+        
+        # Clean up visual elements
+        if self.drag_preview_annotation:
+            try:
+                self.drag_preview_annotation.remove()
+            except:
+                pass
+            self.drag_preview_annotation = None
+            
+        if self.highlight_scatter:
+            try:
+                self.highlight_scatter.remove()
+            except:
+                pass
+            self.highlight_scatter = None
+        
+        # Reset state
         self.dragging = False
         self.drag_index = None
+        self.initial_click_pos = None
+        self.is_external_drag = False
+        
+        if hasattr(self, 'canvas'):
+            self.canvas.draw_idle()
     
     def _on_hover(self, event):
         if event.inaxes != self.ax:
@@ -793,6 +1017,7 @@ class PlotResultsCoordinator(QWidget):
     
     task_selected = pyqtSignal(int)  # task_index
     task_updated = pyqtSignal(int, float, float)  # task_index, value, time
+    task_drag_started = pyqtSignal(int, str)  # task_index, task_data (forwarded from graph and table)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -804,8 +1029,8 @@ class PlotResultsCoordinator(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 0, 5, 5)
         
-        # Header
-        self.priority_header = QLabel(">> Drag tasks to prioritize • Drag from priority table to calendar to schedule • Top 3 priorities shown below")
+        # Header with updated instructions
+        self.priority_header = QLabel(">> Drag tasks to prioritize • Drag from graph OR table to calendar to schedule • Top 3 priorities shown below")
         self.priority_header.setStyleSheet("color: #ffffff; font-weight: bold; padding: 5px; font-size: 14px;")
         layout.addWidget(self.priority_header)
         
@@ -830,12 +1055,12 @@ class PlotResultsCoordinator(QWidget):
         """)
         results_layout.addWidget(live_header)
         
-        # Drag instruction
-        drag_instruction = QLabel("✨ Click and drag any task below to schedule it on the calendar!")
+        # Enhanced drag instruction
+        drag_instruction = QLabel("✨ Drag tasks from GRAPH or TABLE below to schedule them on the calendar!")
         drag_instruction.setStyleSheet("""
-            color: #FFD700; font-weight: bold; font-size: 12px; 
-            padding: 5px 8px; background-color: #404040; 
-            border: 1px dashed #FFD700; border-radius: 4px; 
+            color: #00FF7F; font-weight: bold; font-size: 12px; 
+            padding: 8px 12px; background-color: #2a4040; 
+            border: 2px dashed #00FF7F; border-radius: 6px; 
             margin-bottom: 8px;
         """)
         drag_instruction.setWordWrap(True)
@@ -862,7 +1087,9 @@ class PlotResultsCoordinator(QWidget):
     def _connect_signals(self):
         self.plot_widget.task_moved.connect(self._on_task_moved)
         self.plot_widget.task_selected.connect(self._on_task_selected)
+        self.plot_widget.task_drag_started.connect(self._on_task_drag_started)  # Connect graph drag signal
         self.results_table.task_selected.connect(self._on_task_selected)
+        self.results_table.task_drag_started.connect(self._on_task_drag_started)  # Connect table drag signal
     
     def _on_task_moved(self, task_index: int, value: float, time: float):
         """Handle task movement in plot"""
@@ -874,6 +1101,11 @@ class PlotResultsCoordinator(QWidget):
         self.task_selected.emit(task_index)
         self.plot_widget.highlight_task_in_plot(task_index)
         self.results_table.highlight_task(task_index)
+    
+    def _on_task_drag_started(self, task_index: int, task_data: str):
+        """Handle task drag started from either graph or table"""
+        print(f"🎯 Task drag started from coordinator: {task_index} - {task_data}")
+        self.task_drag_started.emit(task_index, task_data)
     
     def set_tasks(self, tasks: List[Task]):
         """Set tasks for display"""

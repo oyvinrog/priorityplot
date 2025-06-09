@@ -127,6 +127,7 @@ class PriorityPlotWidget(QWidget):
         # Plot coordinator signals  
         self.plot_coordinator.task_selected.connect(self.on_task_selected)
         self.plot_coordinator.task_updated.connect(self._on_task_updated)
+        self.plot_coordinator.task_drag_started.connect(self._on_task_drag_started)
         
         # Calendar widget signals
         self.calendar_widget.task_scheduled.connect(self._on_task_scheduled)
@@ -142,6 +143,12 @@ class PriorityPlotWidget(QWidget):
         """Handle task priority updates from plot"""
         self._task_coordinator.update_task_priority(task_index, value, time)
         self._update_displays_except_plot()
+    
+    def _on_task_drag_started(self, task_index: int, task_data: str):
+        """Handle task drag started from plot coordinator (graph or table)"""
+        print(f"🎯 Main widget: Task {task_index} drag started - enabling calendar drop zones")
+        # The drag is now in progress, calendar widgets should be ready to receive drops
+        # No additional action needed here as Qt's drag and drop system handles the rest
     
     def _on_task_scheduled(self, task: Task):
         """Handle task scheduling from calendar"""
