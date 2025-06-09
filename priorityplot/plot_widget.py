@@ -1633,13 +1633,13 @@ Ready to boost your productivity? 🎯
                     # Reset to normal colors (preserve top-3 highlighting)
                     if i == 0:  # Gold for #1
                         item.setBackground(QColor(255, 215, 0, 150))
-                        item.setForeground(QColor(0, 0, 0))
+                        item.setForeground(QColor(255, 255, 255))  # White text for better contrast on gold
                     elif i == 1:  # Silver for #2
                         item.setBackground(QColor(192, 192, 192, 150))
-                        item.setForeground(QColor(0, 0, 0))
+                        item.setForeground(QColor(255, 255, 255))  # White text for better contrast on silver
                     elif i == 2:  # Bronze for #3
                         item.setBackground(QColor(205, 127, 50, 150))
-                        item.setForeground(QColor(255, 255, 255))
+                        item.setForeground(QColor(255, 255, 255))  # White text on bronze
                     else:
                         item.setBackground(QColor())  # Clear background
                         item.setForeground(QColor(255, 255, 255))  # White text
@@ -1859,16 +1859,16 @@ Ready to boost your productivity? 🎯
                     item = self.live_table.item(i, col)
                     if item:
                         item.setBackground(QColor(255, 215, 0, 150))  # Gold
-                        item.setForeground(QColor(0, 0, 0))  # Black text on gold
+                        item.setForeground(QColor(255, 255, 255))  # White text for better contrast on gold
             elif i == 1:  # Silver highlighting for #2
                 for col in range(4):
                     item = self.live_table.item(i, col)
                     if item:
                         item.setBackground(QColor(192, 192, 192, 150))  # Silver
-                        item.setForeground(QColor(0, 0, 0))  # Black text on silver
+                        item.setForeground(QColor(255, 255, 255))  # White text for better contrast on silver
             elif i == 2:  # Bronze highlighting for #3
                 for col in range(4):
                     item = self.live_table.item(i, col)
                     if item:
                         item.setBackground(QColor(205, 127, 50, 150))  # Bronze
-                        item.setForeground(QColor(255, 255, 255))  # White text on bronze 
+                        item.setForeground(QColor(255, 255, 255))  # White text on bronze
