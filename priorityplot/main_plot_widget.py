@@ -190,26 +190,23 @@ class PriorityPlotWidget(QWidget):
     
     def _show_welcome_message(self):
         """Show welcome message for new users"""
-        welcome_text = """
-🎉 <b>Welcome to PriPlot!</b>
-
-Transform your task management with smart priority visualization!
-
-<b>🚀 New User-Controlled Experience:</b>
-• Choose "🧪 Try Sample Tasks" for instant exploration
-• Or "📋 Import List" to paste your own tasks
-• Add tasks manually with the input field
-• <b>Click "Show Results" when you're ready to prioritize!</b>
-
-<b>💡 You're in control!</b>
-Add as many tasks as you want, then click the green "Show Results" button when you're ready to see your priority chart and calendar.
-
-Ready to boost your productivity? 🎯
-        """
+        main_text = "🎉 <b>Welcome to PriPlot!</b>"
+        
+        detailed_text = """Transform your task management with smart priority visualization!<br><br>
+<b>🚀 New User-Controlled Experience:</b><br>
+• Choose "🧪 Try Sample Tasks" for instant exploration<br>
+• Or "📋 Import List" to paste your own tasks<br>
+• Add tasks manually with the input field<br>
+• <b>Click "Show Results" when you're ready to prioritize!</b><br><br>
+<b>💡 You're in control!</b><br>
+Add as many tasks as you want, then click the green "Show Results" button when you're ready to see your priority chart and calendar.<br><br>
+Ready to boost your productivity? 🎯"""
         
         msg = QMessageBox(self)
         msg.setWindowTitle("🎯 Welcome to PriPlot!")
-        msg.setText(welcome_text)
+        msg.setText(main_text)
+        msg.setInformativeText(detailed_text)
+        msg.setTextFormat(Qt.TextFormat.RichText)
         msg.setStyleSheet("""
             QMessageBox {
                 background-color: #353535;
@@ -218,7 +215,8 @@ Ready to boost your productivity? 🎯
             QMessageBox QLabel {
                 color: white;
                 font-size: 13px;
-                min-width: 400px;
+                min-width: 500px;
+                max-width: 600px;
             }
             QMessageBox QPushButton {
                 min-width: 80px;
