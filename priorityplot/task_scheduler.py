@@ -231,11 +231,11 @@ class TimeSelectionDialog(QDialog):
         
         self.start_time = QTimeEdit()
         self.start_time.setTime(QTime(9, 0))
-        self.start_time.setDisplayFormat("hh:mm AP")
+        self.start_time.setDisplayFormat("hh:mm")
         
         self.end_time = QTimeEdit()
         self.end_time.setTime(QTime(10, 0))
-        self.end_time.setDisplayFormat("hh:mm AP")
+        self.end_time.setDisplayFormat("hh:mm")
         
         form_layout.addRow("🕐 Start Time:", self.start_time)
         form_layout.addRow("🕐 End Time:", self.end_time)
@@ -252,8 +252,8 @@ class TimeSelectionDialog(QDialog):
     
     def get_times(self):
         """Return the selected start and end times as strings"""
-        return (self.start_time.time().toString("hh:mm AP"),
-                self.end_time.time().toString("hh:mm AP"))
+        return (self.start_time.time().toString("hh:mm"),
+                self.end_time.time().toString("hh:mm"))
 
 
 class TaskSchedulerWidget(QWidget):
@@ -656,7 +656,7 @@ class TaskSchedulerWidget(QWidget):
                 task.scheduled_date.date() == date and 
                 task.scheduled_end_time):
                 try:
-                    task_end_time = QTime.fromString(task.scheduled_end_time, "hh:mm AP")
+                    task_end_time = QTime.fromString(task.scheduled_end_time, "hh:mm")
                     if not task_end_time.isValid():
                         task_end_time = QTime.fromString(task.scheduled_end_time, "HH:mm")
                     
@@ -806,12 +806,12 @@ class TaskSchedulerWidget(QWidget):
         
         start_time = QTimeEdit()
         start_time.setTime(QTime(9, 0))
-        start_time.setDisplayFormat("hh:mm AP")
+        start_time.setDisplayFormat("hh:mm")
         form_layout.addRow("🕐 Start Time:", start_time)
         
         end_time = QTimeEdit()
         end_time.setTime(QTime(11, 0))
-        end_time.setDisplayFormat("hh:mm AP")
+        end_time.setDisplayFormat("hh:mm")
         form_layout.addRow("🕐 End Time:", end_time)
         
         layout.addLayout(form_layout)
@@ -854,8 +854,8 @@ class TaskSchedulerWidget(QWidget):
                     datetime.min.time()
                 )
                 
-                start_time_str = start_time.time().toString("hh:mm AP")
-                end_time_str = end_time.time().toString("hh:mm AP")
+                start_time_str = start_time.time().toString("hh:mm")
+                end_time_str = end_time.time().toString("hh:mm")
                 
                 new_task.schedule_on_calendar(selected_datetime, start_time_str, end_time_str)
                 

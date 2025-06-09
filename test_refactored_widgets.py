@@ -199,8 +199,8 @@ def test_time_dialog():
     start_time, end_time = dialog.get_times()
     assert isinstance(start_time, str)
     assert isinstance(end_time, str)
-    assert "AM" in start_time or "PM" in start_time
-    assert "AM" in end_time or "PM" in end_time
+    assert ":" in start_time  # Check for time format HH:MM
+    assert ":" in end_time    # Check for time format HH:MM
     
     print("  ✅ TimeSelectionDialog works correctly")
 

@@ -72,11 +72,11 @@ class TimeSelectionDialog(QDialog):
         
         self.start_time = QTimeEdit()
         self.start_time.setTime(QTime(9, 0))  # Default 9:00 AM
-        self.start_time.setDisplayFormat("hh:mm AP")
+        self.start_time.setDisplayFormat("hh:mm")
         
         self.end_time = QTimeEdit()
         self.end_time.setTime(QTime(10, 0))  # Default 10:00 AM  
-        self.end_time.setDisplayFormat("hh:mm AP")
+        self.end_time.setDisplayFormat("hh:mm")
         
         form_layout.addRow("🕐 Start Time:", self.start_time)
         form_layout.addRow("🕐 End Time:", self.end_time)
@@ -93,8 +93,8 @@ class TimeSelectionDialog(QDialog):
     
     def get_times(self) -> tuple[str, str]:
         """Return the selected start and end times as strings"""
-        return (self.start_time.time().toString("hh:mm AP"),
-                self.end_time.time().toString("hh:mm AP"))
+        return (self.start_time.time().toString("hh:mm"),
+                self.end_time.time().toString("hh:mm"))
 
 class EnhancedCalendarWidget(QCalendarWidget):
     """Single responsibility: Enhanced calendar display with task scheduling following SRP
@@ -460,7 +460,7 @@ class ScheduledTasksList(QListWidget):
         
         # Add scheduled tasks to list
         for task_index, task in scheduled_tasks:
-            time_str = task.scheduled_date.strftime("%I:%M %p")
+            time_str = task.scheduled_date.strftime("%H:%M")
             end_time_str = task.scheduled_end_time if task.scheduled_end_time else "End time not set"
             
             item_text = f"📅 {time_str} - {end_time_str}\n    {task.task}"
@@ -661,7 +661,7 @@ class CalendarSchedulingWidget(QWidget):
             
             # Parse the time strings and create datetime
             try:
-                start_time = datetime.strptime(start_time_str, "%I:%M %p").time()
+                start_time = datetime.strptime(start_time_str, "%H:%M").time()
                 scheduled_datetime = datetime.combine(drop_date.date(), start_time)
                 
                 # Schedule the task using the correct method
