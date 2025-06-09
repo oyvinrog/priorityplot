@@ -40,6 +40,10 @@ class InteractivePlotWidget(QWidget):
         self.is_external_drag = False
         self.drag_preview_annotation = None
         
+        # CRITICAL FIX: Store original values to prevent unintended changes
+        self.original_task_value = None
+        self.original_task_time = None
+        
     def _setup_plot(self):
         layout = QVBoxLayout()
         
@@ -252,16 +256,20 @@ class InteractivePlotWidget(QWidget):
             return
         else:
             if self.is_external_drag:
-                self._end_external_drag()
+                return
         
-        # Normal internal dragging within plot
-        if event.inaxes == self.ax:
+        # Normal internal dragging within plot (only if not in external drag mode)
+        if event.inaxes == self.ax and not self.is_external_drag:
             self._handle_internal_drag(event)
     
     def _start_drag(self, event):
         """Start the drag operation with enhanced visual feedback"""
         self.dragging = True
         task = self._tasks[self.drag_index]
+        
+        # CRITICAL FIX: Store original values to restore if external drag is detected
+        self.original_task_value = task.value
+        self.original_task_time = task.time
         
         # Create drag preview annotation
         self.drag_preview_annotation = self.ax.annotate(
@@ -301,6 +309,10 @@ class InteractivePlotWidget(QWidget):
     
     def _handle_internal_drag(self, event):
         """Handle dragging within the plot area"""
+        # CRITICAL FIX: Prevent value changes during external drag
+        if self.is_external_drag:
+            return
+            
         # Update task values
         new_value = max(0, min(TaskConstants.MAX_VALUE, event.xdata))
         new_time = max(0, min(TaskConstants.MAX_TIME, event.ydata))
@@ -335,6 +347,12 @@ class InteractivePlotWidget(QWidget):
         self.is_external_drag = True
         task = self._tasks[self.drag_index]
         
+        # CRITICAL FIX: Restore original values to prevent unintended changes
+        if self.original_task_value is not None and self.original_task_time is not None:
+            task.value = self.original_task_value
+            task.time = self.original_task_time
+            print(f"🔧 Restored original values: value={self.original_task_value}, time={self.original_task_time}")
+        
         # Change cursor to indicate external drag
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.DragMoveCursor))
         
@@ -346,6 +364,18 @@ class InteractivePlotWidget(QWidget):
             self.drag_preview_annotation.get_bbox_patch().set_facecolor('#00FF7F')
             self.drag_preview_annotation.get_bbox_patch().set_edgecolor('#00CC66')
             self.drag_preview_annotation.set_color('#000000')
+            # Update annotation position to original values
+            self.drag_preview_annotation.xy = (task.value, task.time)
+        
+        # Update highlight position to original values
+        if self.highlight_scatter:
+            self.highlight_scatter.set_offsets([[task.value, task.time]])
+        
+        # Update scatter plot data to show restored values
+        x_data = [t.value for t in self._tasks]
+        y_data = [t.time for t in self._tasks]
+        if hasattr(self, 'scatter'):
+            self.scatter.set_offsets(np.column_stack([x_data, y_data]))
         
         # Create and start Qt drag operation
         drag = QDrag(self)
@@ -481,6 +511,10 @@ class InteractivePlotWidget(QWidget):
         self.drag_index = None
         self.initial_click_pos = None
         self.is_external_drag = False
+        
+        # CRITICAL FIX: Reset stored original values
+        self.original_task_value = None
+        self.original_task_time = None
         
         if hasattr(self, 'canvas'):
             self.canvas.draw_idle()
