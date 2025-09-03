@@ -82,6 +82,7 @@ class QuickStartWidget(QWidget):
     
     sample_tasks_requested = pyqtSignal()
     clipboard_import_requested = pyqtSignal()
+    mindmap_import_requested = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -140,6 +141,23 @@ class QuickStartWidget(QWidget):
             }
         """)
         buttons_layout.addWidget(self.clipboard_button)
+        
+        self.mindmap_button = QPushButton("🧠 Import Mindmap")
+        self.mindmap_button.clicked.connect(self.mindmap_import_requested.emit)
+        self.mindmap_button.setToolTip("🌳 Import tasks from indented mindmap structure!\nExample:\nMain Task\n    Sub Task 1\n        Sub Sub Task\n    Sub Task 2")
+        self.mindmap_button.setStyleSheet("""
+            QPushButton {
+                background-color: #6f42c1;
+                font-weight: bold;
+                font-size: 13px;
+                padding: 12px;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #5a2d91;
+            }
+        """)
+        buttons_layout.addWidget(self.mindmap_button)
         
         layout.addLayout(buttons_layout)
         self.setLayout(layout)
@@ -268,6 +286,7 @@ class TaskInputCoordinator(QWidget):
     def _connect_signals(self):
         self.quick_start_widget.sample_tasks_requested.connect(self._add_sample_tasks)
         self.quick_start_widget.clipboard_import_requested.connect(self._import_from_clipboard)
+        self.quick_start_widget.mindmap_import_requested.connect(self._import_mindmap_from_clipboard)
         self.task_input_field.task_added.connect(self._add_task)
     
     def _add_task(self, task_name: str):
@@ -309,6 +328,41 @@ class TaskInputCoordinator(QWidget):
         
         self.task_input_field.set_placeholder_text(f"{len(new_tasks)} tasks added! Click 'Show Results' to prioritize.")
         QMessageBox.information(self, "✅ Tasks Added!", f"Added {len(new_tasks)} tasks from clipboard.\n\n💡 Click 'Show Results' when ready to prioritize!")
+    
+    def _import_mindmap_from_clipboard(self):
+        """Import tasks from mindmap-style indented clipboard"""
+        clipboard = QApplication.clipboard()
+        text = clipboard.text().strip()
+        
+        if not text:
+            QMessageBox.warning(self, "📋 Clipboard Empty", "❌ No text found in clipboard!\n\n💡 Copy indented mindmap text and try again.")
+            return
+        
+        new_tasks = SampleDataGenerator.create_tasks_from_mindmap(text)
+        
+        if not new_tasks:
+            QMessageBox.warning(self, "❌ No Valid Tasks", 
+                              "The clipboard text doesn't contain valid mindmap structure.\n\n"
+                              "💡 Expected format:\n"
+                              "Main Task\n"
+                              "    Sub Task 1\n"
+                              "        Sub Sub Task\n"
+                              "    Sub Task 2\n\n"
+                              "This creates tasks like:\n"
+                              "• Main Task->Sub Task 1\n"
+                              "• Sub Task 1->Sub Sub Task\n"
+                              "• Main Task->Sub Task 2")
+            return
+            
+        self._tasks.extend(new_tasks)
+        self._update_display()
+        self._update_ui_state()
+        
+        self.task_input_field.set_placeholder_text(f"{len(new_tasks)} mindmap tasks added! Click 'Show Results' to prioritize.")
+        QMessageBox.information(self, "🧠 Mindmap Tasks Added!", 
+                              f"✅ Added {len(new_tasks)} tasks from mindmap structure.\n\n"
+                              "🌳 Tasks represent parent->child relationships.\n\n"
+                              "💡 Click 'Show Results' when ready to prioritize!")
     
     def _update_display(self):
         """Update the task table display"""

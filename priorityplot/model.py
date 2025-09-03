@@ -254,6 +254,67 @@ class SampleDataGenerator:
                 continue
         
         return tasks
+    
+    @staticmethod
+    def create_tasks_from_mindmap(text: str) -> List[Task]:
+        """Create tasks from mindmap-style indented text
+        
+        Example input:
+        dette er en tekst
+            dette er een annen tekst
+                dette er en fjerde tekst
+                dette er en femte tekst
+            dette er en tredje tekst
+        
+        Creates tasks like:
+        - dette er en tekst->dette er een annen tekst
+        - dette er een annen tekst->dette er en fjerde tekst
+        - etc.
+        """
+        if not text or not text.strip():
+            return []
+        
+        lines = text.split('\n')
+        tasks = []
+        parent_stack = []  # Stack to keep track of parent nodes at each level
+        
+        for line in lines:
+            if not line.strip():
+                continue
+                
+            # Count indentation level (4 spaces = 1 level)
+            stripped_line = line.lstrip()
+            indent_level = (len(line) - len(stripped_line)) // 4
+            content = stripped_line.strip()
+            
+            if not content:
+                continue
+            
+            # Adjust parent stack to current level
+            while len(parent_stack) > indent_level:
+                parent_stack.pop()
+            
+            # If we have a parent, create a task relationship
+            if parent_stack:
+                parent_content = parent_stack[-1]
+                task_name = f"{parent_content}->{content}"
+                try:
+                    task = TaskValidator.create_validated_task(task_name)
+                    tasks.append(task)
+                except ValueError:
+                    # Skip invalid task names
+                    continue
+            
+            # Add current content to parent stack
+            if len(parent_stack) == indent_level:
+                parent_stack.append(content)
+            else:
+                # Fill gaps in hierarchy if needed
+                while len(parent_stack) < indent_level:
+                    parent_stack.append("")
+                parent_stack.append(content)
+        
+        return tasks
 
 class ExcelExporter:
     """Handles Excel export functionality"""
