@@ -240,9 +240,9 @@ class TaskInputCoordinator(QWidget):
         layout.addWidget(self.task_table)
         
         # Show results button
-        self.show_results_button = QPushButton(">> Show Priority Chart & Calendar")
+        self.show_results_button = QPushButton(">> Show Priority Chart")
         self.show_results_button.clicked.connect(self.show_results_requested.emit)
-        self.show_results_button.setToolTip("💡 Ready to prioritize? Click to see your interactive chart and calendar!")
+        self.show_results_button.setToolTip("💡 Ready to prioritize? Click to see your interactive chart!")
         self.show_results_button.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
@@ -391,7 +391,7 @@ class TaskInputCoordinator(QWidget):
 • "🧪 Try Sample Tasks" - Instantly add 20 realistic work tasks
 • "📋 Import List" - Paste tasks from your clipboard (one per line)
 • Type manually and press Enter to add tasks one by one
-• <b>Click "Show Results" when ready to see your priority chart and calendar</b>
+• <b>Click "Show Results" when ready to see your priority chart</b>
 
 <b>💡 Pro Tips:</b>
 • Add all your tasks first, then click "Show Results" for full control

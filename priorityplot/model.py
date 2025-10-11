@@ -21,7 +21,6 @@ class TaskConstants:
     MEDIUM_PRIORITY_THRESHOLD = 1.0
     
     # Color schemes for task states
-    COLOR_SCHEDULED = '#28a745'  # Green
     COLOR_MOVED = '#2a82da'      # Blue  
     COLOR_ORIGINAL = '#e74c3c'   # Red
 
@@ -29,7 +28,6 @@ class TaskState(Enum):
     """Enumeration for task visual states"""
     ORIGINAL = "original"
     MOVED = "moved"
-    SCHEDULED = "scheduled"
 
 class Task:
     def __init__(self, task: str, value: float, time: float):
@@ -37,36 +35,14 @@ class Task:
         self.value = value
         self.time = time
         self.score = 0.0
-        # Calendar scheduling info
-        self.scheduled_date: Optional[datetime] = None
-        self.scheduled_start_time: Optional[str] = None
-        self.scheduled_end_time: Optional[str] = None
 
     def calculate_score(self):
         self.score = self.value / math.log(max(2.718, self.time))
         return self.score
     
-    def schedule_on_calendar(self, date: datetime, start_time: str = None, end_time: str = None):
-        """Schedule this task on a specific date with optional time range"""
-        self.scheduled_date = date
-        self.scheduled_start_time = start_time
-        self.scheduled_end_time = end_time
-    
-    def clear_schedule(self):
-        """Remove task from calendar scheduling"""
-        self.scheduled_date = None
-        self.scheduled_start_time = None
-        self.scheduled_end_time = None
-    
-    def is_scheduled(self) -> bool:
-        """Check if task is scheduled on calendar"""
-        return self.scheduled_date is not None
-    
     def get_state(self, moved_tasks_indices: Set[int], task_index: int) -> TaskState:
         """Determine the visual state of this task"""
-        if self.is_scheduled():
-            return TaskState.SCHEDULED
-        elif task_index in moved_tasks_indices:
+        if task_index in moved_tasks_indices:
             return TaskState.MOVED
         else:
             return TaskState.ORIGINAL
@@ -75,7 +51,6 @@ class Task:
         """Get the color for this task based on its state"""
         state = self.get_state(moved_tasks_indices, task_index)
         color_map = {
-            TaskState.SCHEDULED: TaskConstants.COLOR_SCHEDULED,
             TaskState.MOVED: TaskConstants.COLOR_MOVED,
             TaskState.ORIGINAL: TaskConstants.COLOR_ORIGINAL
         }
@@ -139,9 +114,7 @@ class TaskDisplayFormatter:
     
     @staticmethod
     def format_task_name(task: Task) -> str:
-        """Format task name with scheduling indicator"""
-        if task.is_scheduled():
-            return f"📅 {task.task}"
+        """Format task name"""
         return task.task
     
     @staticmethod
@@ -152,8 +125,7 @@ class TaskDisplayFormatter:
     @staticmethod
     def get_tooltip_text(task: Task) -> str:
         """Generate tooltip text for a task"""
-        scheduled_text = "Yes" if task.is_scheduled() else "No"
-        return f"Full task: {task.task}\nScheduled: {scheduled_text}"
+        return f"Full task: {task.task}"
 
 class TaskValidator:
     """Validates task data and provides default values"""
@@ -328,8 +300,7 @@ class ExcelExporter:
             ws.title = "Task Priorities"
             
             # Add headers
-            headers = ['📋 Task', '★ Value', '⏰ Time (hours)', '🏆 Priority Score', 
-                      '📅 Scheduled Date', '🕐 Start Time', '🕐 End Time']
+            headers = ['📋 Task', '★ Value', '⏰ Time (hours)', '🏆 Priority Score']
             for col, header in enumerate(headers, 1):
                 ws.cell(row=1, column=col, value=header)
             
@@ -340,19 +311,9 @@ class ExcelExporter:
                 ws.cell(row=row, column=2, value=task.value)
                 ws.cell(row=row, column=3, value=task.time)
                 ws.cell(row=row, column=4, value=task.score)
-                
-                # Add calendar scheduling information
-                if task.is_scheduled():
-                    ws.cell(row=row, column=5, value=task.scheduled_date.strftime('%Y-%m-%d'))
-                    ws.cell(row=row, column=6, value=task.scheduled_start_time if task.scheduled_start_time else "")
-                    ws.cell(row=row, column=7, value=task.scheduled_end_time if task.scheduled_end_time else "")
-                else:
-                    ws.cell(row=row, column=5, value="Not scheduled")
-                    ws.cell(row=row, column=6, value="")
-                    ws.cell(row=row, column=7, value="")
             
             # Format columns
-            for col in range(1, 8):
+            for col in range(1, 5):
                 ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = 15
             
             # Save the file

@@ -2,14 +2,11 @@
 # This maintains the original API while using the new SOLID-compliant structure
 
 from .main_plot_widget import PriorityPlotWidget
-from .calendar_widgets import TimeSelectionDialog, EnhancedCalendarWidget as ScheduleCalendarWidget
 from .plot_widgets import DraggableTaskTable as DraggableTableWidget, ExportWorker as ExcelExportWorker
 
 # Re-export the main widget for backward compatibility
 __all__ = [
     'PriorityPlotWidget',
-    'TimeSelectionDialog', 
-    'ScheduleCalendarWidget',
     'DraggableTableWidget',
     'ExcelExportWorker'
 ]
@@ -19,8 +16,7 @@ __all__ = [
 # 1. interfaces.py - Abstract interfaces following ISP and DIP
 # 2. input_widgets.py - Task input functionality (SRP)  
 # 3. plot_widgets.py - Plot and visualization (SRP)
-# 4. calendar_widgets.py - Calendar and scheduling (SRP)
-# 5. main_plot_widget.py - Main coordinator (SRP, DIP)
+# 4. main_plot_widget.py - Main coordinator (SRP, DIP)
 #
 # SOLID Principles Applied:
 # - SRP: Each module has a single, well-defined responsibility

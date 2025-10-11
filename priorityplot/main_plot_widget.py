@@ -6,7 +6,6 @@ from .interfaces import ITaskCoordinator, IWidgetEventHandler
 from .model import Task, TaskValidator, SampleDataGenerator
 from .input_widgets import TaskInputCoordinator
 from .plot_widgets import PlotResultsCoordinator
-from .calendar_widgets import CalendarSchedulingWidget
 
 class TaskCoordinatorImpl(ITaskCoordinator):
     """Implementation of task coordination following DIP - depends on abstractions"""
@@ -23,13 +22,6 @@ class TaskCoordinatorImpl(ITaskCoordinator):
         except ValueError:
             return False
     
-    def schedule_task(self, task_index: int, date, start_time: str, end_time: str) -> bool:
-        """Schedule a task"""
-        if 0 <= task_index < len(self._task_list):
-            task = self._task_list[task_index]
-            task.schedule_on_calendar(date, start_time, end_time)
-            return True
-        return False
     
     def get_tasks(self) -> List[Task]:
         """Get all tasks"""
@@ -95,27 +87,14 @@ class PriorityPlotWidget(QWidget):
         self.setLayout(layout)
     
     def _setup_results_panel(self):
-        """Setup the results panel with plot and calendar"""
+        """Setup the results panel with plot"""
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Create horizontal splitter for plot and calendar
-        results_splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # Plot results coordinator (left)
+        # Plot results coordinator
         self.plot_coordinator = PlotResultsCoordinator()
         
-        # Calendar scheduling widget (right)
-        self.calendar_widget = CalendarSchedulingWidget(self._task_list)
-        
-        # Add to splitter with proper proportions
-        results_splitter.addWidget(self.plot_coordinator)
-        results_splitter.addWidget(self.calendar_widget)
-        results_splitter.setSizes([2, 1])  # 2:1 ratio
-        results_splitter.setStretchFactor(0, 2)
-        results_splitter.setStretchFactor(1, 1)
-        
-        layout.addWidget(results_splitter)
+        layout.addWidget(self.plot_coordinator)
         self.results_panel.setLayout(layout)
     
     def _connect_signals(self):
@@ -127,12 +106,6 @@ class PriorityPlotWidget(QWidget):
         # Plot coordinator signals  
         self.plot_coordinator.task_selected.connect(self.on_task_selected)
         self.plot_coordinator.task_updated.connect(self._on_task_updated)
-        self.plot_coordinator.task_drag_started.connect(self._on_task_drag_started)
-        
-        # Calendar widget signals
-        self.calendar_widget.task_scheduled.connect(self._on_task_scheduled)
-        self.calendar_widget.task_unscheduled.connect(self._on_task_unscheduled)
-        self.calendar_widget.date_selected.connect(self.on_view_changed)
     
     def _on_tasks_updated(self, tasks: List[Task]):
         """Handle task list updates from input coordinator"""
@@ -142,23 +115,7 @@ class PriorityPlotWidget(QWidget):
     def _on_task_updated(self, task_index: int, value: float, time: float):
         """Handle task priority updates from plot"""
         self._task_coordinator.update_task_priority(task_index, value, time)
-        self._update_displays_except_plot()
-    
-    def _on_task_drag_started(self, task_index: int, task_data: str):
-        """Handle task drag started from plot coordinator (graph or table)"""
-        print(f"🎯 Main widget: Task {task_index} drag started - enabling calendar drop zones")
-        # The drag is now in progress, calendar widgets should be ready to receive drops
-        # No additional action needed here as Qt's drag and drop system handles the rest
-    
-    def _on_task_scheduled(self, task: Task):
-        """Handle task scheduling from calendar"""
-        self._update_displays_except_calendar()
-        self.on_task_modified(self._task_list.index(task))
-    
-    def _on_task_unscheduled(self, task: Task):
-        """Handle task unscheduling from calendar"""
-        self._update_displays_except_calendar()
-        self.on_task_modified(self._task_list.index(task))
+        self._update_all_displays()
     
     def _show_results(self):
         """Transition to results view"""
@@ -178,15 +135,6 @@ class PriorityPlotWidget(QWidget):
     def _update_all_displays(self):
         """Update all display components"""
         self.plot_coordinator.set_tasks(self._task_list)
-        self.calendar_widget.update_task_list(self._task_list)
-    
-    def _update_displays_except_plot(self):
-        """Update displays except the plot (to avoid recursion)"""
-        self.calendar_widget.update_task_list(self._task_list)
-    
-    def _update_displays_except_calendar(self):
-        """Update displays except the calendar (to avoid recursion)"""
-        self.plot_coordinator.set_tasks(self._task_list)
     
     def _show_welcome_message(self):
         """Show welcome message for new users"""
@@ -199,7 +147,7 @@ class PriorityPlotWidget(QWidget):
 • Add tasks manually with the input field<br>
 • <b>Click "Show Results" when you're ready to prioritize!</b><br><br>
 <b>💡 You're in control!</b><br>
-Add as many tasks as you want, then click the green "Show Results" button when you're ready to see your priority chart and calendar.<br><br>
+Add as many tasks as you want, then click the green "Show Results" button when you're ready to see your priority chart.<br><br>
 Ready to boost your productivity? 🎯"""
         
         msg = QMessageBox(self)
@@ -230,12 +178,6 @@ Ready to boost your productivity? 🎯"""
         """Handle task selection across widgets"""
         # Coordinate highlighting across all widgets
         self.plot_coordinator.highlight_task(task_index)
-        
-        # If task is scheduled, highlight in calendar
-        if task_index < len(self._task_list):
-            task = self._task_list[task_index]
-            if task.is_scheduled():
-                self.calendar_widget.highlight_task_date(task)
     
     def on_task_modified(self, task_index: int) -> None:
         """Handle task modification events"""
@@ -261,5 +203,4 @@ Ready to boost your productivity? 🎯"""
     
     def clear_highlighting(self):
         """Clear all highlighting across widgets"""
-        self.plot_coordinator.clear_highlighting()
-        self.calendar_widget.clear_calendar_highlighting() 
+        self.plot_coordinator.clear_highlighting() 

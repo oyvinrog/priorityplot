@@ -28,12 +28,4 @@ class TaskManager:
     
     def clear_all_tasks(self):
         """Clear all tasks"""
-        self._tasks.clear()
-    
-    def get_scheduled_tasks(self):
-        """Get only scheduled tasks"""
-        return [task for task in self._tasks if task.is_scheduled()]
-    
-    def get_unscheduled_tasks(self):
-        """Get only unscheduled tasks"""
-        return [task for task in self._tasks if not task.is_scheduled()] 
+        self._tasks.clear() 

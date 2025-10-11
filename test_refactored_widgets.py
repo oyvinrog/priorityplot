@@ -16,12 +16,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PyQt6.QtWidgets import QApplication
 from priorityplot.model import Task, TaskValidator, SampleDataGenerator
-from priorityplot.interfaces import ITaskInputWidget, ITaskDisplayWidget, IPlotWidget, IExportService, ICalendarWidget
+from priorityplot.interfaces import ITaskInputWidget, ITaskDisplayWidget, IPlotWidget, IExportService
 from priorityplot.input_widgets import TaskInputField, TaskInputCoordinator
 from priorityplot.plot_widgets import InteractivePlotWidget, DraggableTaskTable, ExportButtonWidget
-from priorityplot.calendar_widgets import CalendarSchedulingWidget, TimeSelectionDialog
 from priorityplot.main_plot_widget import PriorityPlotWidget
-from datetime import datetime
 
 def test_srp_principle():
     """Test Single Responsibility Principle - each widget has one clear purpose"""
@@ -40,12 +38,6 @@ def test_srp_principle():
     assert hasattr(plot_widget, 'update_plot')
     assert hasattr(plot_widget, 'highlight_task_in_plot')
     print("  ✅ InteractivePlotWidget: Single responsibility for plotting")
-    
-    # Calendar widget - only handles scheduling
-    calendar_widget = CalendarSchedulingWidget([])
-    assert hasattr(calendar_widget, 'task_scheduled')
-    assert hasattr(calendar_widget, 'update_task_list')
-    print("  ✅ CalendarSchedulingWidget: Single responsibility for scheduling")
 
 def test_interface_segregation():
     """Test Interface Segregation Principle - specific interfaces for specific needs"""
@@ -152,7 +144,6 @@ def test_modular_composition():
     # Test that components are properly coordinated
     assert hasattr(main_widget, 'input_coordinator')
     assert hasattr(main_widget, 'plot_coordinator')
-    assert hasattr(main_widget, 'calendar_widget')
     print("  ✅ Components are properly composed and coordinated")
 
 def test_testability():
@@ -183,27 +174,6 @@ def test_testability():
     table_widget.clear_highlighting()
     print("  ✅ DraggableTaskTable is testable in isolation")
 
-def test_time_dialog():
-    """Test time selection dialog works correctly"""
-    print("\n🧪 Testing Time Selection Dialog")
-    
-    app = QApplication.instance() or QApplication([])
-    
-    dialog = TimeSelectionDialog("Test Task", datetime.now())
-    
-    # Test that dialog is properly configured
-    assert dialog.windowTitle().startswith("⏰ Schedule:")
-    assert hasattr(dialog, 'get_times')
-    
-    # Test time retrieval
-    start_time, end_time = dialog.get_times()
-    assert isinstance(start_time, str)
-    assert isinstance(end_time, str)
-    assert ":" in start_time  # Check for time format HH:MM
-    assert ":" in end_time    # Check for time format HH:MM
-    
-    print("  ✅ TimeSelectionDialog works correctly")
-
 def test_protocol_implementation():
     """Test that widgets implement Protocol interfaces correctly without inheritance"""
     print("\n🧪 Testing Protocol Implementation Without Inheritance")
@@ -216,14 +186,12 @@ def test_protocol_implementation():
     plot_widget = InteractivePlotWidget()
     table_widget = DraggableTaskTable()
     export_widget = ExportButtonWidget()
-    calendar_widget = CalendarSchedulingWidget([])
     
     # Test runtime type checking
     assert isinstance(input_field, ITaskInputWidget)
     assert isinstance(plot_widget, IPlotWidget)
     assert isinstance(table_widget, ITaskDisplayWidget)
     assert isinstance(export_widget, IExportService)
-    assert isinstance(calendar_widget.calendar, ICalendarWidget)
     
     print("  ✅ All widgets correctly implement their Protocol interfaces")
     print("  ✅ Runtime type checking works with @runtime_checkable Protocol")
@@ -240,7 +208,6 @@ def run_all_tests():
     test_open_closed_principle()
     test_modular_composition()
     test_testability()
-    test_time_dialog()
     test_protocol_implementation()
     
     print("\n🎉 All SOLID Principle Tests Passed!")

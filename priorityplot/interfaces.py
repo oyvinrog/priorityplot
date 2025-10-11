@@ -1,14 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Protocol, runtime_checkable
-from PyQt6.QtCore import QDate, pyqtSignal, QObject
-from datetime import datetime
+from PyQt6.QtCore import pyqtSignal
 from .model import Task
-
-class TaskEventEmitter(Protocol):
-    """Protocol for objects that emit task-related events"""
-    task_scheduled: pyqtSignal
-    task_unscheduled: pyqtSignal
-    task_updated: pyqtSignal
 
 @runtime_checkable
 class ITaskInputWidget(Protocol):
@@ -55,22 +48,6 @@ class IPlotWidget(Protocol):
         ...
 
 @runtime_checkable
-class ICalendarWidget(Protocol):
-    """Protocol for calendar widgets following ISP"""
-    
-    def refresh_calendar_display(self) -> None:
-        """Refresh calendar to show scheduled tasks"""
-        ...
-    
-    def highlight_date_for_drop(self, date: datetime) -> None:
-        """Highlight date during drag operations"""
-        ...
-    
-    def clear_drop_highlighting(self) -> None:
-        """Clear drag/drop highlighting"""
-        ...
-
-@runtime_checkable
 class IExportService(Protocol):
     """Protocol for export functionality following SRP - converted from ABC to avoid Qt metaclass conflict"""
     
@@ -88,11 +65,6 @@ class ITaskCoordinator(ABC):
     @abstractmethod
     def add_task(self, task_name: str) -> bool:
         """Add a new task"""
-        pass
-    
-    @abstractmethod
-    def schedule_task(self, task_index: int, date: datetime, start_time: str, end_time: str) -> bool:
-        """Schedule a task"""
         pass
     
     @abstractmethod

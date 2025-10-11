@@ -359,7 +359,7 @@ class InteractivePlotWidget(QWidget):
         # Update drag preview to indicate external drag
         if self.drag_preview_annotation:
             self.drag_preview_annotation.set_text(
-                f"📅 Drop to schedule: {task.task[:15]}{'...' if len(task.task) > 15 else ''}"
+                f"📋 Moving: {task.task[:15]}{'...' if len(task.task) > 15 else ''}"
             )
             self.drag_preview_annotation.get_bbox_patch().set_facecolor('#00FF7F')
             self.drag_preview_annotation.get_bbox_patch().set_edgecolor('#00CC66')
@@ -455,9 +455,9 @@ class InteractivePlotWidget(QWidget):
         painter.setBrush(QColor(0, 255, 127, 180))
         painter.drawRoundedRect(2, 2, pixmap_width-4, pixmap_height-4, 10, 10)
         
-        # Draw calendar icon
+        # Draw task icon
         painter.setPen(QColor(0, 100, 50, 255))
-        painter.drawText(padding, padding + text_height//2 + 5, "📅")
+        painter.drawText(padding, padding + text_height//2 + 5, "📋")
         
         # Draw task text
         painter.setPen(QColor(0, 50, 25, 255))
@@ -1064,7 +1064,7 @@ class PlotResultsCoordinator(QWidget):
         layout.setContentsMargins(5, 0, 5, 5)
         
         # Header with updated instructions
-        self.priority_header = QLabel(">> Drag tasks to prioritize • Drag from graph OR table to calendar to schedule • Top 3 priorities shown below")
+        self.priority_header = QLabel(">> Drag tasks to prioritize • Top 3 priorities shown below")
         self.priority_header.setStyleSheet("color: #ffffff; font-weight: bold; padding: 5px; font-size: 14px;")
         layout.addWidget(self.priority_header)
         
@@ -1081,7 +1081,7 @@ class PlotResultsCoordinator(QWidget):
         results_layout = QVBoxLayout()
         
         # Header
-        live_header = QLabel("🏆 Live Priority Ranking (Drag to Calendar →)")
+        live_header = QLabel("🏆 Live Priority Ranking")
         live_header.setStyleSheet("""
             color: #ffffff; font-weight: bold; font-size: 16px; 
             padding: 8px; background-color: #2a82da; 
@@ -1090,7 +1090,7 @@ class PlotResultsCoordinator(QWidget):
         results_layout.addWidget(live_header)
         
         # Enhanced drag instruction
-        drag_instruction = QLabel("✨ Drag tasks from GRAPH or TABLE below to schedule them on the calendar!")
+        drag_instruction = QLabel("✨ Drag tasks from GRAPH or TABLE to adjust priorities!")
         drag_instruction.setStyleSheet("""
             color: #00FF7F; font-weight: bold; font-size: 12px; 
             padding: 8px 12px; background-color: #2a4040; 
