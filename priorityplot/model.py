@@ -23,36 +23,46 @@ class TaskConstants:
     # Color schemes for task states
     COLOR_MOVED = '#2a82da'      # Blue  
     COLOR_ORIGINAL = '#e74c3c'   # Red
+    COLOR_NEW = '#00FF7F'        # Spring Green - for newly added tasks
 
 class TaskState(Enum):
     """Enumeration for task visual states"""
     ORIGINAL = "original"
     MOVED = "moved"
+    NEW = "new"
 
 class Task:
-    def __init__(self, task: str, value: float, time: float):
+    def __init__(self, task: str, value: float, time: float, is_new: bool = False):
         self.task = task
         self.value = value
         self.time = time
         self.score = 0.0
+        self.is_new = is_new  # Track if this is a newly added task
 
     def calculate_score(self):
         self.score = self.value / math.log(max(2.718, self.time))
         return self.score
     
-    def get_state(self, moved_tasks_indices: Set[int], task_index: int) -> TaskState:
+    def mark_as_seen(self):
+        """Mark task as no longer new"""
+        self.is_new = False
+    
+    def get_state(self, moved_tasks_indices: Set[int], new_task_indices: Set[int], task_index: int) -> TaskState:
         """Determine the visual state of this task"""
-        if task_index in moved_tasks_indices:
+        if task_index in new_task_indices or self.is_new:
+            return TaskState.NEW
+        elif task_index in moved_tasks_indices:
             return TaskState.MOVED
         else:
             return TaskState.ORIGINAL
     
-    def get_color(self, moved_tasks_indices: Set[int], task_index: int) -> str:
+    def get_color(self, moved_tasks_indices: Set[int], new_task_indices: Set[int], task_index: int) -> str:
         """Get the color for this task based on its state"""
-        state = self.get_state(moved_tasks_indices, task_index)
+        state = self.get_state(moved_tasks_indices, new_task_indices, task_index)
         color_map = {
             TaskState.MOVED: TaskConstants.COLOR_MOVED,
-            TaskState.ORIGINAL: TaskConstants.COLOR_ORIGINAL
+            TaskState.ORIGINAL: TaskConstants.COLOR_ORIGINAL,
+            TaskState.NEW: TaskConstants.COLOR_NEW
         }
         return color_map[state]
 
@@ -61,15 +71,30 @@ class TaskStateManager:
     
     def __init__(self):
         self.moved_points: Set[int] = set()
+        self.new_task_indices: Set[int] = set()
         self.highlighted_task_index: Optional[int] = None
     
     def mark_task_moved(self, task_index: int):
         """Mark a task as having been moved"""
         self.moved_points.add(task_index)
+        # When a task is moved, it's no longer "new"
+        self.new_task_indices.discard(task_index)
     
     def is_task_moved(self, task_index: int) -> bool:
         """Check if a task has been moved"""
         return task_index in self.moved_points
+    
+    def mark_task_new(self, task_index: int):
+        """Mark a task as newly added"""
+        self.new_task_indices.add(task_index)
+    
+    def is_task_new(self, task_index: int) -> bool:
+        """Check if a task is new"""
+        return task_index in self.new_task_indices
+    
+    def clear_new_tasks(self):
+        """Clear all new task tracking"""
+        self.new_task_indices.clear()
     
     def clear_moved_tasks(self):
         """Clear all moved task tracking"""
@@ -356,9 +381,11 @@ def get_top_tasks(tasks: List[Task], count: int = 3) -> List[Task]:
     sorted_tasks = calculate_and_sort_tasks(tasks)
     return sorted_tasks[:count]
 
-def get_task_colors(tasks: List[Task], moved_indices: Set[int]) -> List[str]:
+def get_task_colors(tasks: List[Task], moved_indices: Set[int], new_task_indices: Set[int] = None) -> List[str]:
     """Get colors for all tasks based on their states"""
+    if new_task_indices is None:
+        new_task_indices = set()
     colors = []
     for i, task in enumerate(tasks):
-        colors.append(task.get_color(moved_indices, i))
+        colors.append(task.get_color(moved_indices, new_task_indices, i))
     return colors 

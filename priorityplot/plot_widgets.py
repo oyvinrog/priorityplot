@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, 
                              QTableWidgetItem, QLabel, QMessageBox, QAbstractItemView, 
-                             QHeaderView, QInputDialog, QSplitter, QApplication)
+                             QHeaderView, QInputDialog, QSplitter, QApplication, QLineEdit)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThread, QPoint, QMimeData
 from PyQt6.QtGui import QColor, QFont, QDrag, QPixmap, QPainter, QFontMetrics, QCursor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -63,7 +63,7 @@ class InteractivePlotWidget(QWidget):
         # Set labels
         self.ax.set_xlabel('* Value (Impact/Importance)', color='white', fontsize=11, fontweight='bold')
         self.ax.set_ylabel('Time Investment (Hours)', color='white', fontsize=11, fontweight='bold')
-        self.ax.set_title('Priority Matrix • Click table row to highlight', color='white', fontsize=13, fontweight='bold', pad=10)
+        self.ax.set_title('Priority Matrix • Click table row to highlight • 🆕 Green = New Tasks', color='white', fontsize=13, fontweight='bold', pad=10)
         
         # Style ticks
         self.ax.tick_params(colors='white', which='both')
@@ -111,7 +111,7 @@ class InteractivePlotWidget(QWidget):
                 top_3_indices.append(tasks.index(task))
         
         # Get colors
-        colors = get_task_colors(tasks, self._state_manager.moved_points)
+        colors = get_task_colors(tasks, self._state_manager.moved_points, self._state_manager.new_task_indices)
         
         # Plot regular points
         non_top_indices = [i for i in range(len(tasks)) if i not in top_3_indices]
@@ -578,6 +578,7 @@ class DraggableTaskTable(QTableWidget):
     
     task_selected = pyqtSignal(int)  # original task index
     task_drag_started = pyqtSignal(int, str)  # task index, task data
+    task_delete_requested = pyqtSignal(int)  # task index to delete
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -587,8 +588,8 @@ class DraggableTaskTable(QTableWidget):
         self._setup_table()
         
     def _setup_table(self):
-        self.setColumnCount(4)
-        self.setHorizontalHeaderLabels(['🏆', 'Task', 'Value', 'Score'])
+        self.setColumnCount(5)
+        self.setHorizontalHeaderLabels(['🏆', 'Task', 'Value', 'Score', ''])
         
         # Enhanced styling
         self.setStyleSheet("""
@@ -633,11 +634,12 @@ class DraggableTaskTable(QTableWidget):
         
         # Column widths
         header = self.horizontalHeader()
-        header.setStretchLastSection(True)
+        header.setStretchLastSection(False)
         self.setColumnWidth(0, 60)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.setColumnWidth(2, 90)
         self.setColumnWidth(3, 90)
+        self.setColumnWidth(4, 60)  # Delete button column
         
         # Enable drag
         self.setDragEnabled(True)
@@ -724,6 +726,35 @@ class DraggableTaskTable(QTableWidget):
             font.setBold(True)
             score_item.setFont(font)
         self.setItem(row, 3, score_item)
+        
+        # Delete button
+        delete_btn = QPushButton("🗑️")
+        delete_btn.setToolTip("Remove this task")
+        delete_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                padding: 4px 8px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+            QPushButton:pressed {
+                background-color: #bd2130;
+            }
+        """)
+        # Find original task index
+        original_index = self._tasks.index(task) if task in self._tasks else -1
+        delete_btn.clicked.connect(lambda checked, idx=original_index: self._on_delete_clicked(idx))
+        self.setCellWidget(row, 4, delete_btn)
+    
+    def _on_delete_clicked(self, task_index: int):
+        """Handle delete button click"""
+        if task_index >= 0:
+            self.task_delete_requested.emit(task_index)
     
     def _apply_top_highlighting(self):
         """Apply special highlighting to top 3 tasks"""
@@ -734,7 +765,7 @@ class DraggableTaskTable(QTableWidget):
         ]
         
         for i in range(min(3, self.rowCount())):
-            for col in range(4):
+            for col in range(4):  # Only color first 4 columns (not delete button)
                 item = self.item(i, col)
                 if item:
                     item.setBackground(colors[i])
@@ -1052,6 +1083,8 @@ class PlotResultsCoordinator(QWidget):
     task_selected = pyqtSignal(int)  # task_index
     task_updated = pyqtSignal(int, float, float)  # task_index, value, time
     task_drag_started = pyqtSignal(int, str)  # task_index, task_data (forwarded from graph and table)
+    task_added = pyqtSignal(str)  # task_name (when new task is added)
+    task_deleted = pyqtSignal(int)  # task_index (when task is deleted)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1064,9 +1097,76 @@ class PlotResultsCoordinator(QWidget):
         layout.setContentsMargins(5, 0, 5, 5)
         
         # Header with updated instructions
-        self.priority_header = QLabel(">> Drag tasks to prioritize • Top 3 priorities shown below")
+        header_layout = QHBoxLayout()
+        self.priority_header = QLabel(">> Drag tasks to prioritize • Top 3 priorities shown below • 🆕 New tasks in green")
         self.priority_header.setStyleSheet("color: #ffffff; font-weight: bold; padding: 5px; font-size: 14px;")
-        layout.addWidget(self.priority_header)
+        header_layout.addWidget(self.priority_header)
+        
+        # Clear "new" status button
+        self.clear_new_button = QPushButton("✓ Mark All as Seen")
+        self.clear_new_button.setToolTip("Clear the 'new' status from all tasks")
+        self.clear_new_button.clicked.connect(self._clear_new_status)
+        self.clear_new_button.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """)
+        header_layout.addWidget(self.clear_new_button)
+        header_layout.addStretch()
+        
+        layout.addLayout(header_layout)
+        
+        # Quick add task field
+        quick_add_layout = QHBoxLayout()
+        self.quick_task_input = QLineEdit()
+        self.quick_task_input.setPlaceholderText("➕ Quick add a new task while viewing results...")
+        self.quick_task_input.setToolTip("💡 Type a task name and press Enter to add it!")
+        self.quick_task_input.returnPressed.connect(self._add_quick_task)
+        self.quick_task_input.setStyleSheet("""
+            QLineEdit {
+                padding: 10px 12px;
+                font-size: 13px;
+                border-radius: 5px;
+                border: 2px solid #555555;
+                background-color: #454545;
+            }
+            QLineEdit:focus {
+                border: 2px solid #28a745;
+                background-color: #505050;
+            }
+        """)
+        quick_add_layout.addWidget(self.quick_task_input)
+        
+        self.quick_add_button = QPushButton("➕ Add")
+        self.quick_add_button.clicked.connect(self._add_quick_task)
+        self.quick_add_button.setToolTip("Add new task")
+        self.quick_add_button.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+            QPushButton:pressed {
+                background-color: #1e7e34;
+            }
+        """)
+        quick_add_layout.addWidget(self.quick_add_button)
+        layout.addLayout(quick_add_layout)
         
         # Splitter for plot and results
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -1124,6 +1224,7 @@ class PlotResultsCoordinator(QWidget):
         self.plot_widget.task_drag_started.connect(self._on_task_drag_started)  # Connect graph drag signal
         self.results_table.task_selected.connect(self._on_task_selected)
         self.results_table.task_drag_started.connect(self._on_task_drag_started)  # Connect table drag signal
+        self.results_table.task_delete_requested.connect(self._on_task_delete_requested)
     
     def _on_task_moved(self, task_index: int, value: float, time: float):
         """Handle task movement in plot"""
@@ -1140,6 +1241,44 @@ class PlotResultsCoordinator(QWidget):
         """Handle task drag started from either graph or table"""
         print(f"🎯 Task drag started from coordinator: {task_index} - {task_data}")
         self.task_drag_started.emit(task_index, task_data)
+    
+    def _add_quick_task(self):
+        """Handle quick task addition"""
+        task_text = self.quick_task_input.text().strip()
+        if task_text:
+            self.task_added.emit(task_text)
+            self.quick_task_input.clear()
+            self.quick_task_input.setPlaceholderText("✅ Task added! Add another?")
+            # Reset placeholder after 2 seconds
+            QTimer.singleShot(2000, lambda: self.quick_task_input.setPlaceholderText("➕ Quick add a new task while viewing results..."))
+    
+    def _on_task_delete_requested(self, task_index: int):
+        """Handle task deletion request from results table"""
+        if 0 <= task_index < len(self._tasks):
+            task_name = self._tasks[task_index].task
+            # Confirm deletion
+            reply = QMessageBox.question(
+                self, 
+                "🗑️ Confirm Deletion",
+                f"Are you sure you want to remove this task?\n\n'{task_name}'",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.task_deleted.emit(task_index)
+    
+    def _clear_new_status(self):
+        """Clear the 'new' status from all tasks"""
+        # Clear from all tasks
+        for task in self._tasks:
+            task.mark_as_seen()
+        
+        # Clear from state manager
+        self.plot_widget._state_manager.clear_new_tasks()
+        
+        # Update display
+        self._update_displays()
     
     def set_tasks(self, tasks: List[Task]):
         """Set tasks for display"""

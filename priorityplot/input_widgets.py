@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, 
-                             QLabel, QFrame, QTableWidget, QTableWidgetItem, QMessageBox)
+                             QLabel, QFrame, QTableWidget, QTableWidgetItem, QMessageBox,
+                             QHeaderView, QApplication)
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QApplication
 from typing import List, Optional, Callable
 from .interfaces import ITaskInputWidget, ITaskDisplayWidget
 from .model import Task, SampleDataGenerator, TaskValidator
@@ -166,18 +166,26 @@ class TaskInputTable(QTableWidget):
     """Single responsibility: Display input tasks in table format following SRP
     Implements ITaskDisplayWidget protocol"""
     
+    task_delete_requested = pyqtSignal(int)  # Emit when task deletion is requested
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_table()
     
     def _setup_table(self):
-        self.setColumnCount(1)
-        self.setHorizontalHeaderLabels(["Task"])
+        self.setColumnCount(2)
+        self.setHorizontalHeaderLabels(["Task", "Actions"])
         self.setMaximumHeight(200)
+        self.setColumnWidth(1, 80)
+        self.horizontalHeader().setStretchLastSection(False)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.setStyleSheet("""
             QTableWidget {
                 border-radius: 4px;
                 font-size: 12px;
+            }
+            QTableWidget::item {
+                padding: 4px;
             }
         """)
     
@@ -185,7 +193,30 @@ class TaskInputTable(QTableWidget):
         """Implementation of ITaskDisplayWidget protocol"""
         self.setRowCount(len(tasks))
         for i, task in enumerate(tasks):
+            # Task name
             self.setItem(i, 0, QTableWidgetItem(task.task))
+            
+            # Delete button
+            delete_btn = QPushButton("🗑️")
+            delete_btn.setToolTip("Remove this task")
+            delete_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #dc3545;
+                    color: white;
+                    border: none;
+                    border-radius: 3px;
+                    padding: 4px 8px;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #c82333;
+                }
+                QPushButton:pressed {
+                    background-color: #bd2130;
+                }
+            """)
+            delete_btn.clicked.connect(lambda checked, idx=i: self.task_delete_requested.emit(idx))
+            self.setCellWidget(i, 1, delete_btn)
     
     def highlight_task(self, task_index: int) -> None:
         """Implementation of ITaskDisplayWidget protocol"""
@@ -288,6 +319,7 @@ class TaskInputCoordinator(QWidget):
         self.quick_start_widget.clipboard_import_requested.connect(self._import_from_clipboard)
         self.quick_start_widget.mindmap_import_requested.connect(self._import_mindmap_from_clipboard)
         self.task_input_field.task_added.connect(self._add_task)
+        self.task_table.task_delete_requested.connect(self._delete_task)
     
     def _add_task(self, task_name: str):
         """Add a single task"""
@@ -298,6 +330,24 @@ class TaskInputCoordinator(QWidget):
             self._update_ui_state()
         except ValueError as e:
             QMessageBox.warning(self, "❌ Invalid Task", f"Could not create task:\n\n{str(e)}")
+    
+    def _delete_task(self, task_index: int):
+        """Delete a task by index"""
+        if 0 <= task_index < len(self._tasks):
+            task_name = self._tasks[task_index].task
+            # Confirm deletion
+            reply = QMessageBox.question(
+                self, 
+                "🗑️ Confirm Deletion",
+                f"Are you sure you want to remove this task?\n\n'{task_name}'",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                del self._tasks[task_index]
+                self._update_display()
+                self._update_ui_state()
     
     def _add_sample_tasks(self):
         """Add sample tasks"""

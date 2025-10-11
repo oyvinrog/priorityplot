@@ -102,6 +102,8 @@ class PriorityPlotWidget(QWidget):
         # Plot coordinator signals  
         self.plot_coordinator.task_selected.connect(self.on_task_selected)
         self.plot_coordinator.task_updated.connect(self._on_task_updated)
+        self.plot_coordinator.task_added.connect(self._on_task_added_from_results)
+        self.plot_coordinator.task_deleted.connect(self._on_task_deleted_from_results)
     
     def _on_tasks_updated(self, tasks: List[Task]):
         """Handle task list updates from input coordinator"""
@@ -112,6 +114,29 @@ class PriorityPlotWidget(QWidget):
         """Handle task priority updates from plot"""
         self._task_coordinator.update_task_priority(task_index, value, time)
         self._update_all_displays()
+    
+    def _on_task_added_from_results(self, task_name: str):
+        """Handle task addition from results view"""
+        try:
+            # Create task with is_new=True flag
+            from .model import TaskValidator
+            new_task = TaskValidator.create_validated_task(task_name)
+            new_task.is_new = True  # Mark as new for visual indication
+            self._task_list.append(new_task)
+            
+            # Mark in state manager for plot highlighting
+            new_task_index = len(self._task_list) - 1
+            self.plot_coordinator.plot_widget._state_manager.mark_task_new(new_task_index)
+            
+            self._update_all_displays()
+        except ValueError as e:
+            QMessageBox.warning(self, "❌ Invalid Task", f"Could not add task: {str(e)}")
+    
+    def _on_task_deleted_from_results(self, task_index: int):
+        """Handle task deletion from results view"""
+        if 0 <= task_index < len(self._task_list):
+            del self._task_list[task_index]
+            self._update_all_displays()
     
     def _show_results(self):
         """Transition to results view"""
