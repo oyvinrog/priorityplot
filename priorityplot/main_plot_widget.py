@@ -55,10 +55,6 @@ class PriorityPlotWidget(QWidget):
         # Initialize UI components
         self._setup_ui()
         self._connect_signals()
-        
-        # Show welcome if no tasks
-        if not self._task_list:
-            self._show_welcome_message()
     
     def _setup_ui(self):
         """Setup the main UI layout"""
