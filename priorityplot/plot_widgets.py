@@ -21,6 +21,7 @@ class InteractivePlotWidget(QWidget):
     task_moved = pyqtSignal(int, float, float)  # task_index, value, time
     task_selected = pyqtSignal(int)  # task_index
     task_drag_started = pyqtSignal(int, str)  # task index, task data for external drops
+    task_delete_requested = pyqtSignal(int)  # task index to delete
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -32,6 +33,7 @@ class InteractivePlotWidget(QWidget):
         # Interaction state
         self.dragging = False
         self.drag_index = None
+        self.selected_task_index = None  # Track the selected task for deletion
         self.current_annotation = None
         self.highlight_scatter = None
         self.highlight_elements = []
@@ -43,6 +45,9 @@ class InteractivePlotWidget(QWidget):
         # CRITICAL FIX: Store original values to prevent unintended changes
         self.original_task_value = None
         self.original_task_time = None
+        
+        # Enable keyboard focus to receive key events
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
     def _setup_plot(self):
         layout = QVBoxLayout()
@@ -230,7 +235,10 @@ class InteractivePlotWidget(QWidget):
             if event.button == 1:  # Left mouse button
                 self.initial_click_pos = (event.x, event.y)
                 self.drag_index = task_index
+                self.selected_task_index = task_index  # Track for deletion
                 self.task_selected.emit(task_index)
+                # Set focus to enable keyboard events
+                self.setFocus()
     
     def _on_motion(self, event):
         if self.drag_index is None:
@@ -519,6 +527,16 @@ class InteractivePlotWidget(QWidget):
         if hasattr(self, 'canvas'):
             self.canvas.draw_idle()
     
+    def keyPressEvent(self, event):
+        """Handle keyboard events for task deletion"""
+        from PyQt6.QtCore import Qt
+        if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            # Delete the currently selected task
+            if self.selected_task_index is not None:
+                self.task_delete_requested.emit(self.selected_task_index)
+        else:
+            super().keyPressEvent(event)
+    
     def _on_hover(self, event):
         if event.inaxes != self.ax:
             if self.current_annotation:
@@ -755,6 +773,24 @@ class DraggableTaskTable(QTableWidget):
         """Handle delete button click"""
         if task_index >= 0:
             self.task_delete_requested.emit(task_index)
+    
+    def keyPressEvent(self, event):
+        """Handle keyboard events for task deletion"""
+        from PyQt6.QtCore import Qt
+        if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            # Get currently selected row
+            selected_rows = self.selectionModel().selectedRows()
+            if selected_rows:
+                row = selected_rows[0].row()
+                # Get the task at this row position (sorted order)
+                if 0 <= row < len(self._sorted_tasks):
+                    # Find the original task index in unsorted list
+                    sorted_task = self._sorted_tasks[row]
+                    if sorted_task in self._tasks:
+                        original_index = self._tasks.index(sorted_task)
+                        self.task_delete_requested.emit(original_index)
+        else:
+            super().keyPressEvent(event)
     
     def _apply_top_highlighting(self):
         """Apply special highlighting to top 3 tasks"""
@@ -1222,6 +1258,7 @@ class PlotResultsCoordinator(QWidget):
         self.plot_widget.task_moved.connect(self._on_task_moved)
         self.plot_widget.task_selected.connect(self._on_task_selected)
         self.plot_widget.task_drag_started.connect(self._on_task_drag_started)  # Connect graph drag signal
+        self.plot_widget.task_delete_requested.connect(self._on_task_delete_requested)  # Connect plot delete signal
         self.results_table.task_selected.connect(self._on_task_selected)
         self.results_table.task_drag_started.connect(self._on_task_drag_started)  # Connect table drag signal
         self.results_table.task_delete_requested.connect(self._on_task_delete_requested)
@@ -1253,20 +1290,9 @@ class PlotResultsCoordinator(QWidget):
             QTimer.singleShot(2000, lambda: self.quick_task_input.setPlaceholderText("➕ Quick add a new task while viewing results..."))
     
     def _on_task_delete_requested(self, task_index: int):
-        """Handle task deletion request from results table"""
+        """Handle task deletion request from results table or plot"""
         if 0 <= task_index < len(self._tasks):
-            task_name = self._tasks[task_index].task
-            # Confirm deletion
-            reply = QMessageBox.question(
-                self, 
-                "🗑️ Confirm Deletion",
-                f"Are you sure you want to remove this task?\n\n'{task_name}'",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
-                self.task_deleted.emit(task_index)
+            self.task_deleted.emit(task_index)
     
     def _clear_new_status(self):
         """Clear the 'new' status from all tasks"""

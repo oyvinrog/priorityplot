@@ -226,6 +226,18 @@ class TaskInputTable(QTableWidget):
     def clear_highlighting(self) -> None:
         """Implementation of ITaskDisplayWidget protocol"""
         self.clearSelection()
+    
+    def keyPressEvent(self, event):
+        """Handle keyboard events for task deletion"""
+        from PyQt6.QtCore import Qt
+        if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            # Get currently selected row
+            selected_rows = self.selectionModel().selectedRows()
+            if selected_rows:
+                row = selected_rows[0].row()
+                self.task_delete_requested.emit(row)
+        else:
+            super().keyPressEvent(event)
 
 class TaskInputCoordinator(QWidget):
     """Single responsibility: Coordinate task input operations following SRP"""
@@ -334,20 +346,9 @@ class TaskInputCoordinator(QWidget):
     def _delete_task(self, task_index: int):
         """Delete a task by index"""
         if 0 <= task_index < len(self._tasks):
-            task_name = self._tasks[task_index].task
-            # Confirm deletion
-            reply = QMessageBox.question(
-                self, 
-                "🗑️ Confirm Deletion",
-                f"Are you sure you want to remove this task?\n\n'{task_name}'",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
-                del self._tasks[task_index]
-                self._update_display()
-                self._update_ui_state()
+            del self._tasks[task_index]
+            self._update_display()
+            self._update_ui_state()
     
     def _add_sample_tasks(self):
         """Add sample tasks"""
