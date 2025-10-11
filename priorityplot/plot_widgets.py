@@ -1014,6 +1014,27 @@ class ExportButtonWidget(QWidget):
         """Set tasks for export"""
         self._tasks = tasks
     
+    def _show_export_success(self, title: str, message: str, file_path: str):
+        """Show export success message with copy to clipboard option"""
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        
+        # Add custom buttons
+        copy_button = msg_box.addButton("📋 Copy Path", QMessageBox.ButtonRole.ActionRole)
+        ok_button = msg_box.addButton("OK", QMessageBox.ButtonRole.AcceptRole)
+        
+        msg_box.exec()
+        
+        # Check which button was clicked
+        if msg_box.clickedButton() == copy_button:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(file_path)
+            # Show a quick confirmation
+            QMessageBox.information(self, "✅ Copied!", 
+                                  f"📋 Path copied to clipboard:\n\n{file_path}")
+    
     def _quick_export(self):
         """Quick export to default location"""
         if not self._tasks:
@@ -1036,9 +1057,12 @@ class ExportButtonWidget(QWidget):
             
             if success:
                 folder_name = os.path.basename(save_dir)
-                QMessageBox.information(self, "✅ Quick Export Successful!", 
-                                      f"🎉 Exported to {folder_name} folder!\n\n"
-                                      f"📁 File: {filename}")
+                self._show_export_success(
+                    "✅ Quick Export Successful!",
+                    f"🎉 Exported to {folder_name} folder!\n\n"
+                    f"📁 File: {filename}",
+                    file_path
+                )
             else:
                 QMessageBox.critical(self, "❌ Export Error", "Failed to export tasks.")
                 
@@ -1102,8 +1126,11 @@ class ExportButtonWidget(QWidget):
     def _on_export_finished(self, file_path: str):
         self.export_button.setText('📁 Export to Custom Location')
         self.export_button.setEnabled(True)
-        QMessageBox.information(self, "✅ Export Successful!", 
-                              f"🎉 Exported successfully!\n\n📁 {file_path}")
+        self._show_export_success(
+            "✅ Export Successful!",
+            f"🎉 Exported successfully!\n\n📁 {file_path}",
+            file_path
+        )
     
     def _on_export_error(self, error_message: str):
         self.export_button.setText('📁 Export to Custom Location')
