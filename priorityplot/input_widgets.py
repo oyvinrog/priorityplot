@@ -25,13 +25,21 @@ class TaskInputField(QWidget):
         self.task_input.returnPressed.connect(self._on_return_pressed)
         self.task_input.setStyleSheet("""
             QLineEdit {
-                padding: 12px;
+                padding: 14px 16px;
                 font-size: 14px;
-                border-radius: 6px;
-                border: 2px solid #555555;
+                border-radius: 10px;
+                border: 2px solid #2D3139;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1F2228, stop:1 #181A1F);
+                color: #E5E7EB;
+                selection-background-color: #4F46E5;
             }
             QLineEdit:focus {
-                border: 2px solid #2a82da;
+                border: 2px solid #6366F1;
+                background: #252830;
+            }
+            QLineEdit:hover {
+                border: 2px solid #3F4451;
             }
         """)
         layout.addWidget(self.task_input)
@@ -40,13 +48,21 @@ class TaskInputField(QWidget):
         self.add_button.clicked.connect(self._on_add_clicked)
         self.add_button.setStyleSheet("""
             QPushButton {
-                background-color: #6c757d;
-                padding: 8px;
-                border-radius: 4px;
-                font-size: 12px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #4B5563, stop:1 #374151);
+                padding: 10px 16px;
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                color: #E5E7EB;
             }
             QPushButton:hover {
-                background-color: #5a6268;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #6B7280, stop:1 #4B5563);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #374151, stop:1 #1F2937);
             }
         """)
         layout.addWidget(self.add_button)
@@ -92,17 +108,19 @@ class QuickStartWidget(QWidget):
         # Quick start frame
         self.setStyleSheet("""
             QFrame {
-                background-color: #404040;
-                border-radius: 8px;
-                padding: 10px;
-                margin: 5px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #252830, stop:1 #1F2228);
+                border-radius: 12px;
+                padding: 16px;
+                margin: 8px;
+                border: 1px solid #2D3139;
             }
         """)
         
         layout = QVBoxLayout()
         
-        quick_label = QLabel("🚀 Quick Start:")
-        quick_label.setStyleSheet("color: #ffffff; font-weight: bold; margin-bottom: 8px;")
+        quick_label = QLabel("🚀 Quick Start")
+        quick_label.setStyleSheet("color: #F3F4F6; font-weight: 700; font-size: 14px; margin-bottom: 10px; letter-spacing: 0.5px;")
         layout.addWidget(quick_label)
         
         # Horizontal layout for buttons
@@ -113,14 +131,21 @@ class QuickStartWidget(QWidget):
         self.test_button.setToolTip("🚀 Instantly try the app with 20 realistic work tasks!")
         self.test_button.setStyleSheet("""
             QPushButton {
-                background-color: #28a745;
-                font-weight: bold;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #10B981, stop:1 #059669);
+                font-weight: 700;
                 font-size: 13px;
-                padding: 12px;
-                border-radius: 6px;
+                padding: 14px 18px;
+                border-radius: 10px;
+                color: white;
             }
             QPushButton:hover {
-                background-color: #34ce57;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #34D399, stop:1 #10B981);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #059669, stop:1 #047857);
             }
         """)
         buttons_layout.addWidget(self.test_button)
@@ -130,14 +155,21 @@ class QuickStartWidget(QWidget):
         self.clipboard_button.setToolTip("📄 Paste a list of tasks from your clipboard!")
         self.clipboard_button.setStyleSheet("""
             QPushButton {
-                background-color: #007bff;
-                font-weight: bold;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3B82F6, stop:1 #2563EB);
+                font-weight: 700;
                 font-size: 13px;
-                padding: 12px;
-                border-radius: 6px;
+                padding: 14px 18px;
+                border-radius: 10px;
+                color: white;
             }
             QPushButton:hover {
-                background-color: #0056b3;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #60A5FA, stop:1 #3B82F6);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #2563EB, stop:1 #1D4ED8);
             }
         """)
         buttons_layout.addWidget(self.clipboard_button)
@@ -147,14 +179,21 @@ class QuickStartWidget(QWidget):
         self.mindmap_button.setToolTip("🌳 Import tasks from indented mindmap structure!\nExample:\nMain Task\n    Sub Task 1\n        Sub Sub Task\n    Sub Task 2")
         self.mindmap_button.setStyleSheet("""
             QPushButton {
-                background-color: #6f42c1;
-                font-weight: bold;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #8B5CF6, stop:1 #7C3AED);
+                font-weight: 700;
                 font-size: 13px;
-                padding: 12px;
-                border-radius: 6px;
+                padding: 14px 18px;
+                border-radius: 10px;
+                color: white;
             }
             QPushButton:hover {
-                background-color: #5a2d91;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #A78BFA, stop:1 #8B5CF6);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #7C3AED, stop:1 #6D28D9);
             }
         """)
         buttons_layout.addWidget(self.mindmap_button)
@@ -181,11 +220,17 @@ class TaskInputTable(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.setStyleSheet("""
             QTableWidget {
-                border-radius: 4px;
-                font-size: 12px;
+                border-radius: 10px;
+                font-size: 13px;
+                background: #181A1F;
+                border: 2px solid #2D3139;
             }
             QTableWidget::item {
-                padding: 4px;
+                padding: 8px;
+                color: #E5E7EB;
+            }
+            QTableWidget::item:hover {
+                background-color: #252830;
             }
         """)
     
@@ -201,18 +246,22 @@ class TaskInputTable(QTableWidget):
             delete_btn.setToolTip("Remove this task")
             delete_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #dc3545;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #EF4444, stop:1 #DC2626);
                     color: white;
                     border: none;
-                    border-radius: 3px;
-                    padding: 4px 8px;
+                    border-radius: 6px;
+                    padding: 6px 10px;
                     font-size: 14px;
+                    font-weight: 600;
                 }
                 QPushButton:hover {
-                    background-color: #c82333;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #F87171, stop:1 #EF4444);
                 }
                 QPushButton:pressed {
-                    background-color: #bd2130;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #DC2626, stop:1 #B91C1C);
                 }
             """)
             delete_btn.clicked.connect(lambda checked, idx=i: self.task_delete_requested.emit(idx))
@@ -256,8 +305,8 @@ class TaskInputCoordinator(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         
         # Header
-        header_label = QLabel(">> Add Your Tasks")
-        header_label.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 16px; padding: 15px 10px 10px 10px;")
+        header_label = QLabel("Add Your Tasks")
+        header_label.setStyleSheet("color: #F3F4F6; font-weight: 700; font-size: 20px; padding: 20px 12px 12px 12px; letter-spacing: 0.5px;")
         layout.addWidget(header_label)
         
         # Quick start widget
@@ -265,8 +314,8 @@ class TaskInputCoordinator(QWidget):
         layout.addWidget(self.quick_start_widget)
         
         # Separator
-        separator = QLabel("─── or add manually ───")
-        separator.setStyleSheet("color: #888888; text-align: center; margin: 15px 0px;")
+        separator = QLabel("or add manually")
+        separator.setStyleSheet("color: #6B7280; text-align: center; margin: 18px 0px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;")
         separator.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(separator)
         
@@ -275,32 +324,37 @@ class TaskInputCoordinator(QWidget):
         layout.addWidget(self.task_input_field)
         
         # Task list
-        list_label = QLabel("📋 Your Tasks:")
-        list_label.setStyleSheet("color: #ffffff; font-weight: bold; margin-top: 20px; margin-bottom: 5px;")
+        list_label = QLabel("📋 Your Tasks")
+        list_label.setStyleSheet("color: #F3F4F6; font-weight: 700; font-size: 14px; margin-top: 24px; margin-bottom: 8px; letter-spacing: 0.5px;")
         layout.addWidget(list_label)
         
         self.task_table = TaskInputTable()
         layout.addWidget(self.task_table)
         
         # Show results button
-        self.show_results_button = QPushButton(">> Show Priority Chart")
+        self.show_results_button = QPushButton("Show Priority Chart →")
         self.show_results_button.clicked.connect(self.show_results_requested.emit)
         self.show_results_button.setToolTip("💡 Ready to prioritize? Click to see your interactive chart!")
         self.show_results_button.setStyleSheet("""
             QPushButton {
-                background-color: #28a745;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #10B981, stop:1 #059669);
                 color: white;
-                font-weight: bold;
-                font-size: 14px;
-                padding: 12px;
-                border-radius: 6px;
-                margin: 15px 0px;
+                font-weight: 700;
+                font-size: 15px;
+                padding: 16px 24px;
+                border-radius: 12px;
+                margin: 20px 0px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #34ce57;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #34D399, stop:1 #10B981);
             }
             QPushButton:pressed {
-                background-color: #1e7e34;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #059669, stop:1 #047857);
+                padding: 17px 24px 15px 24px;
             }
         """)
         layout.addWidget(self.show_results_button)
@@ -311,14 +365,22 @@ class TaskInputCoordinator(QWidget):
         help_button.clicked.connect(self._show_help)
         help_button.setStyleSheet("""
             QPushButton {
-                background-color: #6c757d;
-                font-size: 11px;
-                padding: 6px 12px;
-                border-radius: 4px;
-                margin-top: 10px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #4B5563, stop:1 #374151);
+                font-size: 12px;
+                font-weight: 600;
+                padding: 8px 16px;
+                border-radius: 8px;
+                margin-top: 12px;
+                color: #E5E7EB;
             }
             QPushButton:hover {
-                background-color: #5a6268;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #6B7280, stop:1 #4B5563);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #374151, stop:1 #1F2937);
             }
         """)
         layout.addWidget(help_button)
@@ -457,13 +519,20 @@ Happy prioritizing! 🚀📅
         msg.setText(help_text)
         msg.setStyleSheet("""
             QMessageBox {
-                background-color: #353535;
-                color: white;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1F2228, stop:1 #181A1F);
+                color: #E5E7EB;
+                border: 2px solid #4F46E5;
+                border-radius: 12px;
             }
             QMessageBox QLabel {
-                color: white;
+                color: #E5E7EB;
                 font-size: 13px;
                 min-width: 500px;
+            }
+            QMessageBox QPushButton {
+                min-width: 100px;
+                padding: 10px 16px;
             }
         """)
         msg.exec()

@@ -19,117 +19,164 @@ def main():
         # If emoji font setup fails, continue without it
         pass
     
-    # Set modern color scheme
+    # Set modern color scheme - Professional design system
     app.setStyle("Fusion")
     palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
-    palette.setColor(QPalette.ColorRole.Base, QColor(35, 35, 35))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
-    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(255, 255, 255))
-    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(255, 255, 255))
-    palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
-    palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
-    palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
-    palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+    # Rich dark background with subtle depth
+    palette.setColor(QPalette.ColorRole.Window, QColor(24, 26, 31))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor(229, 231, 235))
+    palette.setColor(QPalette.ColorRole.Base, QColor(17, 19, 23))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(31, 34, 40))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(17, 19, 23))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(229, 231, 235))
+    palette.setColor(QPalette.ColorRole.Text, QColor(229, 231, 235))
+    palette.setColor(QPalette.ColorRole.Button, QColor(31, 34, 40))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor(229, 231, 235))
+    palette.setColor(QPalette.ColorRole.BrightText, QColor(248, 113, 113))
+    palette.setColor(QPalette.ColorRole.Link, QColor(96, 165, 250))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(79, 70, 229))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
     
-    # Set modern stylesheet
+    # Set modern stylesheet - Professional design system
     app.setStyleSheet("""
+        /* Modern design system with refined aesthetics */
         QMainWindow {
-            background-color: #353535;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #181A1F, stop:1 #0F1117);
         }
+        
         QTabWidget::pane {
-            border: 1px solid #555555;
-            background-color: #353535;
+            border: 1px solid #2D3139;
+            background-color: #181A1F;
+            border-radius: 8px;
         }
+        
         QTabBar::tab {
-            background-color: #454545;
-            color: #ffffff;
-            padding: 8px 20px;
-            border: 1px solid #555555;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #1F2228, stop:1 #181A1F);
+            color: #9CA3AF;
+            padding: 10px 24px;
+            border: 1px solid #2D3139;
             border-bottom: none;
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-            font-weight: bold;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            margin-right: 2px;
         }
+        
         QTabBar::tab:selected {
-            background-color: #2a82da;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #4F46E5, stop:1 #4338CA);
+            color: #FFFFFF;
+            border-bottom: 2px solid #6366F1;
         }
+        
         QTabBar::tab:hover:!selected {
-            background-color: #505050;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #252830, stop:1 #1F2228);
+            color: #E5E7EB;
         }
+        
         QPushButton {
-            background-color: #2a82da;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #6366F1, stop:1 #4F46E5);
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            min-width: 80px;
-            font-weight: 500;
-        }
-        QPushButton:hover {
-            background-color: #3292ea;
-        }
-        QPushButton:pressed {
-            background-color: #1a72ca;
-        }
-        QLineEdit {
-            padding: 8px 12px;
-            border: 1px solid #555555;
-            border-radius: 4px;
-            background-color: #454545;
-            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            min-width: 90px;
+            font-weight: 600;
             font-size: 13px;
         }
+        
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #818CF8, stop:1 #6366F1);
+        }
+        
+        QPushButton:pressed {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #4338CA, stop:1 #3730A3);
+            padding: 11px 20px 9px 20px;
+        }
+        
+        QLineEdit {
+            padding: 11px 14px;
+            border: 2px solid #2D3139;
+            border-radius: 8px;
+            background-color: #1F2228;
+            color: #E5E7EB;
+            font-size: 13px;
+            selection-background-color: #4F46E5;
+        }
+        
         QLineEdit:focus {
-            border: 2px solid #2a82da;
-            background-color: #505050;
+            border: 2px solid #6366F1;
+            background-color: #252830;
         }
+        
         QLabel {
-            color: #ffffff;
+            color: #E5E7EB;
         }
+        
         QTableWidget {
-            background-color: #353535;
-            alternate-background-color: #454545;
-            color: white;
-            gridline-color: #555555;
-            border: 1px solid #555555;
-            border-radius: 4px;
+            background-color: #181A1F;
+            alternate-background-color: #1F2228;
+            color: #E5E7EB;
+            gridline-color: #2D3139;
+            border: 2px solid #2D3139;
+            border-radius: 8px;
         }
+        
         QTableWidget::item {
-            padding: 8px;
-            border-bottom: 1px solid #555555;
+            padding: 10px;
+            border-bottom: 1px solid #2D3139;
         }
+        
         QTableWidget::item:selected {
-            background-color: #2a82da;
+            background-color: #4F46E5;
+            color: #FFFFFF;
         }
+        
         QHeaderView::section {
-            background-color: #454545;
-            color: white;
-            padding: 8px;
-            border: 1px solid #555555;
-            font-weight: bold;
-        }
-        QToolTip {
-            background-color: #2a2a2a;
-            color: white;
-            border: 2px solid #555555;
-            border-radius: 6px;
-            padding: 8px;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #252830, stop:1 #1F2228);
+            color: #F3F4F6;
+            padding: 10px;
+            border: 1px solid #2D3139;
+            font-weight: 600;
             font-size: 12px;
-            font-weight: normal;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
+        
+        QToolTip {
+            background-color: #111317;
+            color: #E5E7EB;
+            border: 2px solid #4F46E5;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 12px;
+        }
+        
         QMessageBox {
-            background-color: #353535;
-            color: white;
+            background-color: #181A1F;
+            color: #E5E7EB;
         }
+        
         QMessageBox QPushButton {
-            min-width: 100px;
-            padding: 6px 12px;
+            min-width: 110px;
+            padding: 8px 16px;
+        }
+        
+        QSplitter::handle {
+            background-color: #2D3139;
+        }
+        
+        QSplitter::handle:hover {
+            background-color: #4F46E5;
         }
     """)
     

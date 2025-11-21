@@ -52,26 +52,30 @@ class InteractivePlotWidget(QWidget):
     def _setup_plot(self):
         layout = QVBoxLayout()
         
-        # Create matplotlib figure
-        self.figure = Figure(figsize=(8, 5), facecolor='#353535')
+        # Create matplotlib figure with modern styling
+        self.figure = Figure(figsize=(8, 5), facecolor='#181A1F')
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
         
         # Set modern plot style
-        self.ax.set_facecolor('#353535')
-        self.ax.grid(True, linestyle='--', alpha=0.3, color='#555555')
-        self.ax.spines['bottom'].set_color('#555555')
-        self.ax.spines['top'].set_color('#555555')
-        self.ax.spines['left'].set_color('#555555')
-        self.ax.spines['right'].set_color('#555555')
+        self.ax.set_facecolor('#181A1F')
+        self.ax.grid(True, linestyle='--', alpha=0.2, color='#3F4451', linewidth=0.8)
+        self.ax.spines['bottom'].set_color('#4F46E5')
+        self.ax.spines['top'].set_color('#2D3139')
+        self.ax.spines['left'].set_color('#4F46E5')
+        self.ax.spines['right'].set_color('#2D3139')
+        self.ax.spines['bottom'].set_linewidth(2)
+        self.ax.spines['left'].set_linewidth(2)
+        self.ax.spines['top'].set_linewidth(0.5)
+        self.ax.spines['right'].set_linewidth(0.5)
         
-        # Set labels
-        self.ax.set_xlabel('* Value (Impact/Importance)', color='white', fontsize=11, fontweight='bold')
-        self.ax.set_ylabel('Time Investment (Hours)', color='white', fontsize=11, fontweight='bold')
-        self.ax.set_title('Priority Matrix • Click table row to highlight • 🆕 Green = New Tasks', color='white', fontsize=13, fontweight='bold', pad=10)
+        # Set labels with modern typography
+        self.ax.set_xlabel('Value (Impact/Importance)', color='#E5E7EB', fontsize=12, fontweight='600', labelpad=10)
+        self.ax.set_ylabel('Time Investment (Hours)', color='#E5E7EB', fontsize=12, fontweight='600', labelpad=10)
+        self.ax.set_title('Priority Matrix  •  Click to highlight  •  🆕 New tasks in green', color='#F3F4F6', fontsize=14, fontweight='700', pad=15)
         
-        # Style ticks
-        self.ax.tick_params(colors='white', which='both')
+        # Style ticks with modern colors
+        self.ax.tick_params(colors='#9CA3AF', which='both', labelsize=10)
         
         # Set fixed axis limits
         self.ax.set_xlim(0, TaskConstants.MAX_VALUE)
@@ -211,18 +215,22 @@ class InteractivePlotWidget(QWidget):
     
     def _reapply_styling(self):
         """Reapply plot styling after clear"""
-        self.ax.set_facecolor('#353535')
-        self.ax.grid(True, linestyle='--', alpha=0.3, color='#555555')
-        self.ax.spines['bottom'].set_color('#555555')
-        self.ax.spines['top'].set_color('#555555')
-        self.ax.spines['left'].set_color('#555555')
-        self.ax.spines['right'].set_color('#555555')
+        self.ax.set_facecolor('#181A1F')
+        self.ax.grid(True, linestyle='--', alpha=0.2, color='#3F4451', linewidth=0.8)
+        self.ax.spines['bottom'].set_color('#4F46E5')
+        self.ax.spines['top'].set_color('#2D3139')
+        self.ax.spines['left'].set_color('#4F46E5')
+        self.ax.spines['right'].set_color('#2D3139')
+        self.ax.spines['bottom'].set_linewidth(2)
+        self.ax.spines['left'].set_linewidth(2)
+        self.ax.spines['top'].set_linewidth(0.5)
+        self.ax.spines['right'].set_linewidth(0.5)
         
-        self.ax.set_xlabel('* Value (Impact/Importance)', color='white', fontsize=11, fontweight='bold')
-        self.ax.set_ylabel('Time Investment (Hours)', color='white', fontsize=11, fontweight='bold')
-        self.ax.set_title('Priority Matrix • Click table row to highlight', color='white', fontsize=13, fontweight='bold', pad=10)
+        self.ax.set_xlabel('Value (Impact/Importance)', color='#E5E7EB', fontsize=12, fontweight='600', labelpad=10)
+        self.ax.set_ylabel('Time Investment (Hours)', color='#E5E7EB', fontsize=12, fontweight='600', labelpad=10)
+        self.ax.set_title('Priority Matrix  •  Click to highlight', color='#F3F4F6', fontsize=14, fontweight='700', pad=15)
         
-        self.ax.tick_params(colors='white', which='both')
+        self.ax.tick_params(colors='#9CA3AF', which='both', labelsize=10)
         self.ax.set_xlim(0, TaskConstants.MAX_VALUE)
         self.ax.set_ylim(0, TaskConstants.MAX_TIME)
     
@@ -609,38 +617,44 @@ class DraggableTaskTable(QTableWidget):
         self.setColumnCount(5)
         self.setHorizontalHeaderLabels(['🏆', 'Task', 'Value', 'Score', ''])
         
-        # Enhanced styling
+        # Modern enhanced styling
         self.setStyleSheet("""
             QTableWidget {
-                font-size: 14px;
-                border-radius: 6px;
-                border: 2px solid #555555;
-                background-color: #404040;
-                selection-background-color: #2a82da;
-                gridline-color: #666666;
+                font-size: 13px;
+                border-radius: 12px;
+                border: 2px solid #2D3139;
+                background: #181A1F;
+                selection-background-color: #4F46E5;
+                gridline-color: #2D3139;
             }
             QTableWidget::item {
-                padding: 12px 8px;
-                border-bottom: 1px solid #555555;
-                min-height: 16px;
+                padding: 14px 10px;
+                border-bottom: 1px solid #2D3139;
+                min-height: 18px;
+                color: #E5E7EB;
             }
             QTableWidget::item:hover {
-                background-color: #555555;
-                border: 1px solid #2a82da;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #252830, stop:1 #1F2228);
+                border: none;
             }
             QTableWidget::item:selected {
-                background-color: #2a82da;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #6366F1, stop:1 #4F46E5);
                 color: white;
-                font-weight: bold;
+                font-weight: 700;
             }
             QHeaderView::section {
-                background-color: #555555;
-                color: white;
-                padding: 12px 8px;
-                font-size: 13px;
-                font-weight: bold;
-                border: 1px solid #666666;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #252830, stop:1 #1F2228);
+                color: #F3F4F6;
+                padding: 14px 10px;
+                font-size: 12px;
+                font-weight: 700;
+                border: 1px solid #2D3139;
                 text-align: center;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
         """)
         
@@ -750,18 +764,22 @@ class DraggableTaskTable(QTableWidget):
         delete_btn.setToolTip("Remove this task")
         delete_btn.setStyleSheet("""
             QPushButton {
-                background-color: #dc3545;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #EF4444, stop:1 #DC2626);
                 color: white;
                 border: none;
-                border-radius: 3px;
-                padding: 4px 8px;
+                border-radius: 6px;
+                padding: 6px 10px;
                 font-size: 14px;
+                font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #c82333;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #F87171, stop:1 #EF4444);
             }
             QPushButton:pressed {
-                background-color: #bd2130;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #DC2626, stop:1 #B91C1C);
             }
         """)
         # Find original task index
@@ -961,41 +979,53 @@ class ExportButtonWidget(QWidget):
         layout = QVBoxLayout()
         
         # Quick export button (primary)
-        self.quick_export_button = QPushButton('📊 Export to Excel (Quick)')
+        self.quick_export_button = QPushButton('📊 Export to Excel')
         self.quick_export_button.clicked.connect(self._quick_export)
         self.quick_export_button.setToolTip("💾 Save to Downloads folder - RECOMMENDED")
         self.quick_export_button.setStyleSheet("""
             QPushButton {
-                background-color: #28a745;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #10B981, stop:1 #059669);
                 color: white;
                 border: none;
-                padding: 12px;
-                border-radius: 5px;
-                font-weight: bold;
-                font-size: 13px;
+                padding: 14px 20px;
+                border-radius: 10px;
+                font-weight: 700;
+                font-size: 14px;
             }
             QPushButton:hover {
-                background-color: #218838;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #34D399, stop:1 #10B981);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #059669, stop:1 #047857);
             }
         """)
         layout.addWidget(self.quick_export_button)
         
         # Custom location export (secondary)
-        self.export_button = QPushButton('📁 Export to Custom Location')
+        self.export_button = QPushButton('📁 Custom Location')
         self.export_button.clicked.connect(self._custom_export)
         self.export_button.setToolTip("💾 Choose save location")
         self.export_button.setStyleSheet("""
             QPushButton {
-                background-color: #007bff;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3B82F6, stop:1 #2563EB);
                 color: white;
                 border: none;
-                padding: 8px;
-                border-radius: 5px;
-                font-weight: bold;
-                font-size: 11px;
+                padding: 10px 16px;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #0056b3;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #60A5FA, stop:1 #3B82F6);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #2563EB, stop:1 #1D4ED8);
             }
         """)
         layout.addWidget(self.export_button)
@@ -1161,25 +1191,32 @@ class PlotResultsCoordinator(QWidget):
         
         # Header with updated instructions
         header_layout = QHBoxLayout()
-        self.priority_header = QLabel(">> Drag tasks to prioritize • Top 3 priorities shown below • 🆕 New tasks in green")
-        self.priority_header.setStyleSheet("color: #ffffff; font-weight: bold; padding: 5px; font-size: 14px;")
+        self.priority_header = QLabel("Drag tasks to prioritize  •  Top 3 shown below  •  🆕 New tasks in green")
+        self.priority_header.setStyleSheet("color: #F3F4F6; font-weight: 700; padding: 8px; font-size: 14px; letter-spacing: 0.3px;")
         header_layout.addWidget(self.priority_header)
         
         # Clear "new" status button
-        self.clear_new_button = QPushButton("✓ Mark All as Seen")
+        self.clear_new_button = QPushButton("✓ Mark All Seen")
         self.clear_new_button.setToolTip("Clear the 'new' status from all tasks")
         self.clear_new_button.clicked.connect(self._clear_new_status)
         self.clear_new_button.setStyleSheet("""
             QPushButton {
-                background-color: #6c757d;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #4B5563, stop:1 #374151);
                 color: white;
                 border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
+                padding: 8px 14px;
+                border-radius: 8px;
                 font-size: 11px;
+                font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #5a6268;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #6B7280, stop:1 #4B5563);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #374151, stop:1 #1F2937);
             }
         """)
         header_layout.addWidget(self.clear_new_button)
@@ -1190,20 +1227,26 @@ class PlotResultsCoordinator(QWidget):
         # Quick add task field
         quick_add_layout = QHBoxLayout()
         self.quick_task_input = QLineEdit()
-        self.quick_task_input.setPlaceholderText("➕ Quick add a new task while viewing results...")
+        self.quick_task_input.setPlaceholderText("➕ Quick add a new task...")
         self.quick_task_input.setToolTip("💡 Type a task name and press Enter to add it!")
         self.quick_task_input.returnPressed.connect(self._add_quick_task)
         self.quick_task_input.setStyleSheet("""
             QLineEdit {
-                padding: 10px 12px;
+                padding: 12px 16px;
                 font-size: 13px;
-                border-radius: 5px;
-                border: 2px solid #555555;
-                background-color: #454545;
+                border-radius: 10px;
+                border: 2px solid #2D3139;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1F2228, stop:1 #181A1F);
+                color: #E5E7EB;
+                selection-background-color: #4F46E5;
             }
             QLineEdit:focus {
-                border: 2px solid #28a745;
-                background-color: #505050;
+                border: 2px solid #10B981;
+                background: #252830;
+            }
+            QLineEdit:hover {
+                border: 2px solid #3F4451;
             }
         """)
         quick_add_layout.addWidget(self.quick_task_input)
@@ -1213,19 +1256,22 @@ class PlotResultsCoordinator(QWidget):
         self.quick_add_button.setToolTip("Add new task")
         self.quick_add_button.setStyleSheet("""
             QPushButton {
-                background-color: #28a745;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #10B981, stop:1 #059669);
                 color: white;
                 border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                font-weight: bold;
+                padding: 12px 24px;
+                border-radius: 10px;
+                font-weight: 700;
                 font-size: 13px;
             }
             QPushButton:hover {
-                background-color: #218838;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #34D399, stop:1 #10B981);
             }
             QPushButton:pressed {
-                background-color: #1e7e34;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #059669, stop:1 #047857);
             }
         """)
         quick_add_layout.addWidget(self.quick_add_button)
@@ -1246,19 +1292,24 @@ class PlotResultsCoordinator(QWidget):
         # Header
         live_header = QLabel("🏆 Live Priority Ranking")
         live_header.setStyleSheet("""
-            color: #ffffff; font-weight: bold; font-size: 16px; 
-            padding: 8px; background-color: #2a82da; 
-            border-radius: 6px; margin-bottom: 5px;
+            color: #FFFFFF; font-weight: 700; font-size: 17px; 
+            padding: 12px 16px;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 #6366F1, stop:1 #4F46E5);
+            border-radius: 10px; margin-bottom: 8px;
+            letter-spacing: 0.5px;
         """)
         results_layout.addWidget(live_header)
         
         # Enhanced drag instruction
-        drag_instruction = QLabel("✨ Drag tasks from GRAPH or TABLE to adjust priorities!")
+        drag_instruction = QLabel("✨ Drag tasks from graph or table to adjust priorities")
         drag_instruction.setStyleSheet("""
-            color: #00FF7F; font-weight: bold; font-size: 12px; 
-            padding: 8px 12px; background-color: #2a4040; 
-            border: 2px dashed #00FF7F; border-radius: 6px; 
-            margin-bottom: 8px;
+            color: #34D399; font-weight: 600; font-size: 12px; 
+            padding: 10px 14px;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #1F2937, stop:1 #111827);
+            border: 2px solid #10B981; border-radius: 10px; 
+            margin-bottom: 10px; letter-spacing: 0.3px;
         """)
         drag_instruction.setWordWrap(True)
         results_layout.addWidget(drag_instruction)

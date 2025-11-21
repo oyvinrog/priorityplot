@@ -178,18 +178,21 @@ Ready to boost your productivity? 🎯"""
         msg.setTextFormat(Qt.TextFormat.RichText)
         msg.setStyleSheet("""
             QMessageBox {
-                background-color: #353535;
-                color: white;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1F2228, stop:1 #181A1F);
+                color: #E5E7EB;
+                border: 2px solid #4F46E5;
+                border-radius: 12px;
             }
             QMessageBox QLabel {
-                color: white;
+                color: #E5E7EB;
                 font-size: 13px;
                 min-width: 500px;
                 max-width: 600px;
             }
             QMessageBox QPushButton {
-                min-width: 80px;
-                padding: 8px;
+                min-width: 100px;
+                padding: 10px 16px;
             }
         """)
         msg.exec()
