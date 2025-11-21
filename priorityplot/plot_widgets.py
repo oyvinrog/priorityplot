@@ -13,6 +13,8 @@ import os
 from .interfaces import IPlotWidget, ITaskDisplayWidget, IExportService
 from .model import (Task, TaskConstants, TaskStateManager, TaskDisplayFormatter, 
                    ExcelExporter, get_top_tasks, get_task_colors)
+from .ui_constants import (ColorPalette, SizeConstants, OpacityConstants, 
+                           InteractionConstants, LayoutConstants, FigureConstants)
 
 class InteractivePlotWidget(QWidget):
     """Single responsibility: Handle interactive plot functionality following SRP
@@ -37,7 +39,7 @@ class InteractivePlotWidget(QWidget):
         self.current_annotation = None
         self.highlight_scatter = None
         self.highlight_elements = []
-        self.drag_threshold = 5  # pixels before starting drag
+        self.drag_threshold = InteractionConstants.DRAG_THRESHOLD_PIXELS
         self.initial_click_pos = None
         self.is_external_drag = False
         self.drag_preview_annotation = None
@@ -53,29 +55,56 @@ class InteractivePlotWidget(QWidget):
         layout = QVBoxLayout()
         
         # Create matplotlib figure with modern styling
-        self.figure = Figure(figsize=(8, 5), facecolor='#181A1F')
+        self.figure = Figure(
+            figsize=(FigureConstants.FIG_WIDTH, FigureConstants.FIG_HEIGHT),
+            facecolor=ColorPalette.BG_PRIMARY
+        )
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
         
         # Set modern plot style
-        self.ax.set_facecolor('#181A1F')
-        self.ax.grid(True, linestyle='--', alpha=0.2, color='#3F4451', linewidth=0.8)
-        self.ax.spines['bottom'].set_color('#4F46E5')
-        self.ax.spines['top'].set_color('#2D3139')
-        self.ax.spines['left'].set_color('#4F46E5')
-        self.ax.spines['right'].set_color('#2D3139')
-        self.ax.spines['bottom'].set_linewidth(2)
-        self.ax.spines['left'].set_linewidth(2)
-        self.ax.spines['top'].set_linewidth(0.5)
-        self.ax.spines['right'].set_linewidth(0.5)
+        self.ax.set_facecolor(ColorPalette.PLOT_BG)
+        self.ax.grid(
+            True,
+            linestyle='--',
+            alpha=OpacityConstants.ALPHA_GRID,
+            color=ColorPalette.GRID_LINE,
+            linewidth=SizeConstants.LINE_WIDTH_NORMAL
+        )
+        self.ax.spines['bottom'].set_color(ColorPalette.ACCENT_PURPLE)
+        self.ax.spines['top'].set_color(ColorPalette.BORDER_PRIMARY)
+        self.ax.spines['left'].set_color(ColorPalette.ACCENT_PURPLE)
+        self.ax.spines['right'].set_color(ColorPalette.BORDER_PRIMARY)
+        self.ax.spines['bottom'].set_linewidth(SizeConstants.LINE_WIDTH_THICK)
+        self.ax.spines['left'].set_linewidth(SizeConstants.LINE_WIDTH_THICK)
+        self.ax.spines['top'].set_linewidth(SizeConstants.LINE_WIDTH_THIN)
+        self.ax.spines['right'].set_linewidth(SizeConstants.LINE_WIDTH_THIN)
         
         # Set labels with modern typography
-        self.ax.set_xlabel('Value (Impact/Importance)', color='#E5E7EB', fontsize=12, fontweight='600', labelpad=10)
-        self.ax.set_ylabel('Time Investment (Hours)', color='#E5E7EB', fontsize=12, fontweight='600', labelpad=10)
-        self.ax.set_title('Priority Matrix  •  Click to highlight  •  🆕 New tasks in green', color='#F3F4F6', fontsize=14, fontweight='700', pad=15)
+        self.ax.set_xlabel(
+            'Value (Impact/Importance)',
+            color=ColorPalette.TEXT_PRIMARY,
+            fontsize=SizeConstants.FONT_LARGE,
+            fontweight='600',
+            labelpad=LayoutConstants.LABEL_PAD
+        )
+        self.ax.set_ylabel(
+            'Time Investment (Hours)',
+            color=ColorPalette.TEXT_PRIMARY,
+            fontsize=SizeConstants.FONT_LARGE,
+            fontweight='600',
+            labelpad=LayoutConstants.LABEL_PAD
+        )
+        self.ax.set_title(
+            'Priority Matrix  •  Click to highlight  •  🆕 New tasks in green',
+            color=ColorPalette.TEXT_SECONDARY,
+            fontsize=SizeConstants.FONT_XXLARGE,
+            fontweight='700',
+            pad=LayoutConstants.LABEL_PAD_LARGE
+        )
         
         # Style ticks with modern colors
-        self.ax.tick_params(colors='#9CA3AF', which='both', labelsize=10)
+        self.ax.tick_params(colors=ColorPalette.TEXT_MUTED, which='both', labelsize=SizeConstants.FONT_NORMAL)
         
         # Set fixed axis limits
         self.ax.set_xlim(0, TaskConstants.MAX_VALUE)
@@ -130,8 +159,8 @@ class InteractivePlotWidget(QWidget):
                 [y_data[i] for i in non_top_indices],
                 c=[colors[i] for i in non_top_indices],
                 picker=True,
-                alpha=0.7,
-                s=100
+                alpha=OpacityConstants.ALPHA_SCATTER,
+                s=SizeConstants.SCATTER_NORMAL
             )
         
         # Plot top 3 with special styling
@@ -139,16 +168,31 @@ class InteractivePlotWidget(QWidget):
             if task_index < len(tasks):
                 task_x = x_data[task_index]
                 task_y = y_data[task_index]
-                self.ax.plot(task_x, task_y, 'o', markersize=20, markerfacecolor='none', 
-                            markeredgecolor=colors[task_index], markeredgewidth=2)
-                self.ax.text(task_x, task_y, str(rank), ha='center', va='center', 
-                            fontsize=14, fontweight='bold', color=colors[task_index])
+                self.ax.plot(
+                    task_x, task_y, 'o',
+                    markersize=SizeConstants.SCATTER_TOP_RANK,
+                    markerfacecolor='none',
+                    markeredgecolor=colors[task_index],
+                    markeredgewidth=SizeConstants.LINE_WIDTH_THICK
+                )
+                self.ax.text(
+                    task_x, task_y, str(rank),
+                    ha='center', va='center',
+                    fontsize=SizeConstants.FONT_XXLARGE,
+                    fontweight='bold',
+                    color=colors[task_index]
+                )
         
         # Update scatter reference for event handling
-        self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True, alpha=0)
+        self.scatter = self.ax.scatter(x_data, y_data, c=colors, picker=True, alpha=OpacityConstants.ALPHA_HIDDEN)
         
         # Adjust layout
-        self.figure.subplots_adjust(left=0.12, bottom=0.12, right=0.95, top=0.92)
+        self.figure.subplots_adjust(
+            left=LayoutConstants.FIG_LEFT,
+            bottom=LayoutConstants.FIG_BOTTOM,
+            right=LayoutConstants.FIG_RIGHT,
+            top=LayoutConstants.FIG_TOP
+        )
         self.canvas.draw()
     
     def highlight_task_in_plot(self, task_index: int) -> None:
@@ -164,17 +208,23 @@ class InteractivePlotWidget(QWidget):
         # Create highlight circle
         self.highlight_scatter = self.ax.scatter(
             [task.value], [task.time],
-            s=400, facecolors='none',
-            edgecolors='#FFD700', linewidths=4,
-            alpha=0.9, zorder=10
+            s=SizeConstants.SCATTER_HIGHLIGHT,
+            facecolors='none',
+            edgecolors=ColorPalette.HIGHLIGHT_GOLD,
+            linewidths=SizeConstants.LINE_WIDTH_EXTRA_THICK,
+            alpha=OpacityConstants.ALPHA_HIGHLIGHT,
+            zorder=10
         )
         
         # Add pulsing effect
         pulse_scatter = self.ax.scatter(
             [task.value], [task.time],
-            s=500, facecolors='none',
-            edgecolors='#FFD700', linewidths=2,
-            alpha=0.5, zorder=9
+            s=SizeConstants.SCATTER_PULSE,
+            facecolors='none',
+            edgecolors=ColorPalette.HIGHLIGHT_GOLD,
+            linewidths=SizeConstants.LINE_WIDTH_THICK,
+            alpha=OpacityConstants.ALPHA_LIGHT,
+            zorder=9
         )
         self.highlight_elements.append(pulse_scatter)
         
@@ -183,9 +233,10 @@ class InteractivePlotWidget(QWidget):
             task.value, task.time + 0.3,
             f"🎯 {task.task[:20]}{'...' if len(task.task) > 20 else ''}",
             ha='center', va='bottom',
-            fontsize=10, fontweight='bold',
-            color='#FFD700',
-            bbox=dict(boxstyle='round,pad=0.3', facecolor='#2a82da', alpha=0.8),
+            fontsize=SizeConstants.FONT_NORMAL,
+            fontweight='bold',
+            color=ColorPalette.HIGHLIGHT_GOLD,
+            bbox=dict(boxstyle='round,pad=0.3', facecolor=ColorPalette.TOOLTIP_BG, alpha=OpacityConstants.ALPHA_DRAG),
             zorder=11
         )
         self.highlight_elements.append(highlight_text)
@@ -215,22 +266,46 @@ class InteractivePlotWidget(QWidget):
     
     def _reapply_styling(self):
         """Reapply plot styling after clear"""
-        self.ax.set_facecolor('#181A1F')
-        self.ax.grid(True, linestyle='--', alpha=0.2, color='#3F4451', linewidth=0.8)
-        self.ax.spines['bottom'].set_color('#4F46E5')
-        self.ax.spines['top'].set_color('#2D3139')
-        self.ax.spines['left'].set_color('#4F46E5')
-        self.ax.spines['right'].set_color('#2D3139')
-        self.ax.spines['bottom'].set_linewidth(2)
-        self.ax.spines['left'].set_linewidth(2)
-        self.ax.spines['top'].set_linewidth(0.5)
-        self.ax.spines['right'].set_linewidth(0.5)
+        self.ax.set_facecolor(ColorPalette.PLOT_BG)
+        self.ax.grid(
+            True,
+            linestyle='--',
+            alpha=OpacityConstants.ALPHA_GRID,
+            color=ColorPalette.GRID_LINE,
+            linewidth=SizeConstants.LINE_WIDTH_NORMAL
+        )
+        self.ax.spines['bottom'].set_color(ColorPalette.ACCENT_PURPLE)
+        self.ax.spines['top'].set_color(ColorPalette.BORDER_PRIMARY)
+        self.ax.spines['left'].set_color(ColorPalette.ACCENT_PURPLE)
+        self.ax.spines['right'].set_color(ColorPalette.BORDER_PRIMARY)
+        self.ax.spines['bottom'].set_linewidth(SizeConstants.LINE_WIDTH_THICK)
+        self.ax.spines['left'].set_linewidth(SizeConstants.LINE_WIDTH_THICK)
+        self.ax.spines['top'].set_linewidth(SizeConstants.LINE_WIDTH_THIN)
+        self.ax.spines['right'].set_linewidth(SizeConstants.LINE_WIDTH_THIN)
         
-        self.ax.set_xlabel('Value (Impact/Importance)', color='#E5E7EB', fontsize=12, fontweight='600', labelpad=10)
-        self.ax.set_ylabel('Time Investment (Hours)', color='#E5E7EB', fontsize=12, fontweight='600', labelpad=10)
-        self.ax.set_title('Priority Matrix  •  Click to highlight', color='#F3F4F6', fontsize=14, fontweight='700', pad=15)
+        self.ax.set_xlabel(
+            'Value (Impact/Importance)',
+            color=ColorPalette.TEXT_PRIMARY,
+            fontsize=SizeConstants.FONT_LARGE,
+            fontweight='600',
+            labelpad=LayoutConstants.LABEL_PAD
+        )
+        self.ax.set_ylabel(
+            'Time Investment (Hours)',
+            color=ColorPalette.TEXT_PRIMARY,
+            fontsize=SizeConstants.FONT_LARGE,
+            fontweight='600',
+            labelpad=LayoutConstants.LABEL_PAD
+        )
+        self.ax.set_title(
+            'Priority Matrix  •  Click to highlight',
+            color=ColorPalette.TEXT_SECONDARY,
+            fontsize=SizeConstants.FONT_XXLARGE,
+            fontweight='700',
+            pad=LayoutConstants.LABEL_PAD_LARGE
+        )
         
-        self.ax.tick_params(colors='#9CA3AF', which='both', labelsize=10)
+        self.ax.tick_params(colors=ColorPalette.TEXT_MUTED, which='both', labelsize=SizeConstants.FONT_NORMAL)
         self.ax.set_xlim(0, TaskConstants.MAX_VALUE)
         self.ax.set_ylim(0, TaskConstants.MAX_TIME)
     
@@ -291,33 +366,36 @@ class InteractivePlotWidget(QWidget):
         self.drag_preview_annotation = self.ax.annotate(
             f"🎯 Dragging: {task.task[:20]}{'...' if len(task.task) > 20 else ''}",
             xy=(task.value, task.time),
-            xytext=(10, -30),
+            xytext=(LayoutConstants.TEXT_OFFSET_X, -LayoutConstants.TEXT_OFFSET_Y_LARGE),
             textcoords='offset points',
             bbox=dict(
                 boxstyle='round,pad=0.5',
-                facecolor='#FFD700',
-                edgecolor='#FF6B35',
-                alpha=0.9,
-                linewidth=2
+                facecolor=ColorPalette.DRAG_PREVIEW_BG,
+                edgecolor=ColorPalette.HIGHLIGHT_GOLD_ALT,
+                alpha=OpacityConstants.ALPHA_HIGHLIGHT,
+                linewidth=SizeConstants.LINE_WIDTH_THICK
             ),
-            color='#000000',
-            fontsize=10,
+            color=ColorPalette.TEXT_BLACK,
+            fontsize=SizeConstants.FONT_NORMAL,
             fontweight='bold',
             zorder=20,
             arrowprops=dict(
                 arrowstyle='->',
                 connectionstyle='arc3,rad=0.1',
-                color='#FF6B35',
-                linewidth=2
+                color=ColorPalette.HIGHLIGHT_GOLD_ALT,
+                linewidth=SizeConstants.LINE_WIDTH_THICK
             )
         )
         
         # Add pulsing highlight to the dragged point
         self.highlight_scatter = self.ax.scatter(
             [task.value], [task.time],
-            s=600, facecolors='none',
-            edgecolors='#FFD700', linewidths=6,
-            alpha=0.8, zorder=15,
+            s=SizeConstants.SCATTER_DRAG,
+            facecolors='none',
+            edgecolors=ColorPalette.HIGHLIGHT_GOLD,
+            linewidths=SizeConstants.LINE_WIDTH_VERY_THICK,
+            alpha=OpacityConstants.ALPHA_DRAG,
+            zorder=15,
             animated=True
         )
         
@@ -353,7 +431,7 @@ class InteractivePlotWidget(QWidget):
         self.canvas.draw_idle()
         
         # Trigger update with delay
-        self.auto_update_timer.start(100)
+        self.auto_update_timer.start(InteractionConstants.AUTO_UPDATE_DELAY_MS)
     
     def _start_external_drag(self, event):
         """Start external drag operation for dropping outside the plot"""
@@ -377,9 +455,9 @@ class InteractivePlotWidget(QWidget):
             self.drag_preview_annotation.set_text(
                 f"📋 Moving: {task.task[:15]}{'...' if len(task.task) > 15 else ''}"
             )
-            self.drag_preview_annotation.get_bbox_patch().set_facecolor('#00FF7F')
-            self.drag_preview_annotation.get_bbox_patch().set_edgecolor('#00CC66')
-            self.drag_preview_annotation.set_color('#000000')
+            self.drag_preview_annotation.get_bbox_patch().set_facecolor(ColorPalette.EXTERNAL_DRAG_BG)
+            self.drag_preview_annotation.get_bbox_patch().set_edgecolor(ColorPalette.HIGHLIGHT_GREEN_DARK)
+            self.drag_preview_annotation.set_color(ColorPalette.TEXT_BLACK)
             # Update annotation position to original values
             self.drag_preview_annotation.xy = (task.value, task.time)
         
@@ -436,9 +514,9 @@ class InteractivePlotWidget(QWidget):
             self.drag_preview_annotation.set_text(
                 f"🎯 Dragging: {task.task[:20]}{'...' if len(task.task) > 20 else ''}"
             )
-            self.drag_preview_annotation.get_bbox_patch().set_facecolor('#FFD700')
-            self.drag_preview_annotation.get_bbox_patch().set_edgecolor('#FF6B35')
-            self.drag_preview_annotation.set_color('#000000')
+            self.drag_preview_annotation.get_bbox_patch().set_facecolor(ColorPalette.DRAG_PREVIEW_BG)
+            self.drag_preview_annotation.get_bbox_patch().set_edgecolor(ColorPalette.HIGHLIGHT_GOLD_ALT)
+            self.drag_preview_annotation.set_color(ColorPalette.TEXT_BLACK)
         
         self.canvas.draw_idle()
     
@@ -568,22 +646,22 @@ class InteractivePlotWidget(QWidget):
             self.current_annotation = self.ax.annotate(
                 text,
                 xy=(task.value, task.time),
-                xytext=(10, 10),
+                xytext=(LayoutConstants.TEXT_OFFSET_X, LayoutConstants.TEXT_OFFSET_Y),
                 textcoords='offset points',
                 bbox=dict(
                     boxstyle='round,pad=0.5',
-                    fc='#2a82da',
-                    ec='#555555',
-                    alpha=0.9
+                    fc=ColorPalette.TOOLTIP_BG,
+                    ec=ColorPalette.TEXT_DISABLED,
+                    alpha=OpacityConstants.ALPHA_TOOLTIP
                 ),
-                color='white',
-                fontsize=9,
+                color=ColorPalette.TEXT_WHITE,
+                fontsize=SizeConstants.FONT_SMALL,
                 fontweight='bold',
                 arrowprops=dict(
                     arrowstyle='->',
                     connectionstyle='arc3,rad=0.2',
-                    color='#555555',
-                    linewidth=1.5
+                    color=ColorPalette.TEXT_DISABLED,
+                    linewidth=SizeConstants.LINE_WIDTH_MEDIUM
                 )
             )
             self.canvas.draw_idle()
