@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QSplitter
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QSplitter, QMessageBox
 from PyQt6.QtCore import Qt, pyqtSignal
 from typing import List
 
@@ -102,6 +102,7 @@ class PriorityPlotWidget(QWidget):
         # Plot coordinator signals  
         self.plot_coordinator.task_selected.connect(self.on_task_selected)
         self.plot_coordinator.task_updated.connect(self._on_task_updated)
+        self.plot_coordinator.task_added.connect(self._on_task_added_from_results)
         self.plot_coordinator.task_deleted.connect(self._on_task_deleted_from_results)
     
     def _on_tasks_updated(self, tasks: List[Task]):
@@ -119,6 +120,15 @@ class PriorityPlotWidget(QWidget):
         if 0 <= task_index < len(self._task_list):
             del self._task_list[task_index]
             self._update_all_displays()
+
+    def _on_task_added_from_results(self, task_name: str):
+        """Handle task addition from results view"""
+        try:
+            new_task = TaskValidator.create_validated_task(task_name)
+            self._task_list.append(new_task)
+            self._update_all_displays()
+        except ValueError as e:
+            QMessageBox.warning(self, "Invalid Task", f"Could not add task:\n{str(e)}")
     
     def _show_results(self):
         """Transition to results view"""

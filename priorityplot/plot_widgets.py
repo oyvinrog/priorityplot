@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QTableWidget,
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
                              QTableWidgetItem, QLabel, QMessageBox, QAbstractItemView,
-                             QHeaderView, QSplitter, QApplication)
+                             QHeaderView, QSplitter, QApplication, QLineEdit)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPoint, QMimeData
 from PyQt6.QtGui import QColor, QFont, QDrag, QPixmap, QPainter, QFontMetrics, QCursor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -1091,6 +1091,7 @@ class PlotResultsCoordinator(QWidget):
     task_selected = pyqtSignal(int)  # task_index
     task_updated = pyqtSignal(int, float, float)  # task_index, value, time
     task_drag_started = pyqtSignal(int, str)  # task_index, task_data (forwarded from graph and table)
+    task_added = pyqtSignal(str)  # task_name (when new task is added)
     task_deleted = pyqtSignal(int)  # task_index (when task is deleted)
     
     def __init__(self, parent=None):
@@ -1106,6 +1107,17 @@ class PlotResultsCoordinator(QWidget):
         title_label = QLabel("Priority plot")
         title_label.setStyleSheet("color: #C9D2DD; font-weight: 600; padding: 6px 0px; font-size: 12px;")
         layout.addWidget(title_label)
+
+        quick_add_layout = QHBoxLayout()
+        self.quick_task_input = QLineEdit()
+        self.quick_task_input.setPlaceholderText("Add a task")
+        self.quick_task_input.returnPressed.connect(self._add_quick_task)
+        quick_add_layout.addWidget(self.quick_task_input)
+
+        self.quick_add_button = QPushButton("Add")
+        self.quick_add_button.clicked.connect(self._add_quick_task)
+        quick_add_layout.addWidget(self.quick_add_button)
+        layout.addLayout(quick_add_layout)
         
         # Splitter for plot and results
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -1164,7 +1176,14 @@ class PlotResultsCoordinator(QWidget):
     def _on_task_drag_started(self, task_index: int, task_data: str):
         """Handle task drag started from either graph or table"""
         self.task_drag_started.emit(task_index, task_data)
-    
+
+    def _add_quick_task(self):
+        """Handle quick task addition"""
+        task_text = self.quick_task_input.text().strip()
+        if task_text:
+            self.task_added.emit(task_text)
+            self.quick_task_input.clear()
+
     def _on_task_delete_requested(self, task_index: int):
         """Handle task deletion request from results table or plot"""
         if 0 <= task_index < len(self._tasks):
