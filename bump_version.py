@@ -36,8 +36,19 @@ def update_file(path: Path, pattern: re.Pattern[str], new_version: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bump project version.")
-    parser.add_argument("version", help="New version (e.g. 0.1.3)")
+    parser.add_argument("version", nargs="?", help="New version (e.g. 0.1.3)")
     args = parser.parse_args()
+
+    if args.version is None:
+        path, pattern = next(iter(VERSION_FILES.items()))
+        if not path.exists():
+            raise SystemExit(f"Missing file: {path}")
+        for line in path.read_text(encoding="utf-8").splitlines():
+            match = pattern.match(line)
+            if match:
+                print(match.group(2))
+                return
+        raise SystemExit(f"Version string not found in {path}")
 
     for path, pattern in VERSION_FILES.items():
         if not path.exists():
