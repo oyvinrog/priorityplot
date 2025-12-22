@@ -12,4 +12,15 @@ New-Item -ItemType Directory -Force $installerDir | Out-Null
 
 $outFile = Join-Path $installerDir ("PriorityPlot_{0}.exe" -f $version)
 
-& makensis /DVERSION=$version /DINPUT_DIR="$inputDir" /DOUTFILE="$outFile" "$rootDir\\packaging\\windows\\priorityplot.nsi"
+$nsisPath = Join-Path ${env:ProgramFiles(x86)} "NSIS\\makensis.exe"
+if (-not (Test-Path $nsisPath)) {
+  $nsisPath = Join-Path $env:ProgramFiles "NSIS\\makensis.exe"
+}
+if (-not (Test-Path $nsisPath)) {
+  $nsisPath = (Get-Command makensis -ErrorAction SilentlyContinue).Source
+}
+if (-not $nsisPath) {
+  throw "NSIS not found. Install NSIS or ensure makensis is on PATH."
+}
+
+& $nsisPath /DVERSION=$version /DINPUT_DIR="$inputDir" /DOUTFILE="$outFile" "$rootDir\\packaging\\windows\\priorityplot.nsi"
