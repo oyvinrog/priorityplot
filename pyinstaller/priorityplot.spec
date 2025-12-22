@@ -4,8 +4,11 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 project_root = Path.cwd()
-if not (project_root / "pyinstaller").exists():
-    project_root = project_root.parent
+if not (project_root / "run_app.py").exists():
+    if (project_root / "pyinstaller").exists():
+        project_root = project_root
+    else:
+        project_root = project_root.parent
 
 datas = []
 datas += collect_data_files("matplotlib")
@@ -16,7 +19,7 @@ hiddenimports += collect_submodules("matplotlib")
 block_cipher = None
 
 a = Analysis(
-    ["run_app.py"],
+    [str(project_root / "run_app.py")],
     pathex=[str(project_root)],
     binaries=[],
     datas=datas,
