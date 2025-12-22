@@ -3,7 +3,9 @@ from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-project_root = Path(__file__).resolve().parents[1]
+project_root = Path.cwd()
+if not (project_root / "pyinstaller").exists():
+    project_root = project_root.parent
 
 datas = []
 datas += collect_data_files("matplotlib")
