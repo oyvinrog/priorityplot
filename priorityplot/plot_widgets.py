@@ -96,11 +96,12 @@ class InteractivePlotWidget(QWidget):
             labelpad=LayoutConstants.LABEL_PAD
         )
         self.ax.set_title(
-            'Priority Plot',
+            'Priority Matrix  •  Click to highlight',
             color=ColorPalette.TEXT_SECONDARY,
-            fontsize=SizeConstants.FONT_XLARGE,
-            fontweight='600',
-            pad=LayoutConstants.LABEL_PAD_LARGE
+            fontsize=SizeConstants.FONT_HEADER,
+            fontweight='bold',
+            pad=LayoutConstants.LABEL_PAD_LARGE,
+            fontstyle='normal'
         )
         
         # Style ticks with modern colors
@@ -109,6 +110,12 @@ class InteractivePlotWidget(QWidget):
         # Set fixed axis limits
         self.ax.set_xlim(0, TaskConstants.MAX_VALUE)
         self.ax.set_ylim(0, TaskConstants.MAX_TIME)
+        
+        # Add quadrant lines for visual structure
+        mid_x = TaskConstants.MAX_VALUE / 2
+        mid_y = TaskConstants.MAX_TIME / 2
+        self.ax.axvline(x=mid_x, color=ColorPalette.ACCENT_PURPLE, linestyle='-', alpha=0.3, linewidth=1.5)
+        self.ax.axhline(y=mid_y, color=ColorPalette.ACCENT_PURPLE, linestyle='-', alpha=0.3, linewidth=1.5)
         
         layout.addWidget(self.canvas)
         self.setLayout(layout)
@@ -300,14 +307,20 @@ class InteractivePlotWidget(QWidget):
         self.ax.set_title(
             'Priority Matrix  •  Click to highlight',
             color=ColorPalette.TEXT_SECONDARY,
-            fontsize=SizeConstants.FONT_XXLARGE,
-            fontweight='700',
+            fontsize=SizeConstants.FONT_HEADER,
+            fontweight='bold',
             pad=LayoutConstants.LABEL_PAD_LARGE
         )
         
         self.ax.tick_params(colors=ColorPalette.TEXT_MUTED, which='both', labelsize=SizeConstants.FONT_NORMAL)
         self.ax.set_xlim(0, TaskConstants.MAX_VALUE)
         self.ax.set_ylim(0, TaskConstants.MAX_TIME)
+        
+        # Add quadrant lines for visual structure
+        mid_x = TaskConstants.MAX_VALUE / 2
+        mid_y = TaskConstants.MAX_TIME / 2
+        self.ax.axvline(x=mid_x, color=ColorPalette.ACCENT_PURPLE, linestyle='-', alpha=0.3, linewidth=1.5)
+        self.ax.axhline(y=mid_y, color=ColorPalette.ACCENT_PURPLE, linestyle='-', alpha=0.3, linewidth=1.5)
     
     def _on_press(self, event):
         if event.inaxes != self.ax:
@@ -689,11 +702,12 @@ class DraggableTaskTable(QTableWidget):
         self._tasks = []
         self._sorted_tasks = []
         self._parent_widget = parent
+        self._max_score = 1.0  # Track max score for progress bar scaling
         self._setup_table()
         
     def _setup_table(self):
-        self.setColumnCount(5)
-        self.setHorizontalHeaderLabels(['🏆', 'Task', 'Value', 'Score', ''])
+        self.setColumnCount(6)
+        self.setHorizontalHeaderLabels(['🏆', 'TASK', 'VALUE', 'SCORE', '', ''])
         
         # Modern enhanced styling
         self.setStyleSheet("""
@@ -740,16 +754,17 @@ class DraggableTaskTable(QTableWidget):
         self.verticalHeader().setVisible(False)
         self.setAlternatingRowColors(True)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.verticalHeader().setDefaultSectionSize(35)
+        self.verticalHeader().setDefaultSectionSize(40)
         
         # Column widths
         header = self.horizontalHeader()
         header.setStretchLastSection(False)
-        self.setColumnWidth(0, 60)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.setColumnWidth(2, 90)
-        self.setColumnWidth(3, 90)
-        self.setColumnWidth(4, 60)  # Delete button column
+        self.setColumnWidth(0, 50)   # Rank column
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Task name
+        self.setColumnWidth(2, 70)   # Value column
+        self.setColumnWidth(3, 70)   # Score column  
+        self.setColumnWidth(4, 100)  # Progress bar column
+        self.setColumnWidth(5, 50)   # Delete button column
         
         # Enable drag
         self.setDragEnabled(True)
@@ -767,6 +782,9 @@ class DraggableTaskTable(QTableWidget):
         for task in tasks:
             task.calculate_score()
         self._sorted_tasks = sorted(tasks, key=lambda t: t.score, reverse=True)
+        
+        # Calculate max score for progress bar scaling
+        self._max_score = max((t.score for t in tasks), default=1.0) if tasks else 1.0
         
         # Update table
         display_count = min(TaskConstants.MAX_DISPLAY_TASKS, len(self._sorted_tasks))
@@ -837,33 +855,75 @@ class DraggableTaskTable(QTableWidget):
             score_item.setFont(font)
         self.setItem(row, 3, score_item)
         
+        # Progress bar (visual score indicator)
+        progress_widget = self._create_progress_bar(task.score, row)
+        self.setCellWidget(row, 4, progress_widget)
+        
         # Delete button
-        delete_btn = QPushButton("🗑️")
+        delete_btn = QPushButton("✕")
         delete_btn.setToolTip("Remove this task")
         delete_btn.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #EF4444, stop:1 #DC2626);
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-size: 14px;
-                font-weight: 600;
+                background: transparent;
+                color: #EF4444;
+                border: 1px solid #3D4451;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 12px;
+                font-weight: bold;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #F87171, stop:1 #EF4444);
+                background: #EF4444;
+                color: white;
+                border: 1px solid #EF4444;
             }
             QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #DC2626, stop:1 #B91C1C);
+                background: #DC2626;
             }
         """)
         # Find original task index
         original_index = self._tasks.index(task) if task in self._tasks else -1
         delete_btn.clicked.connect(lambda checked, idx=original_index: self._on_delete_clicked(idx))
-        self.setCellWidget(row, 4, delete_btn)
+        self.setCellWidget(row, 5, delete_btn)
+    
+    def _create_progress_bar(self, score: float, row: int) -> QWidget:
+        """Create a gradient progress bar widget for score visualization"""
+        from PyQt6.QtWidgets import QProgressBar
+        
+        # Calculate percentage based on max score
+        percentage = int((score / self._max_score) * 100) if self._max_score > 0 else 0
+        percentage = min(100, max(0, percentage))
+        
+        progress = QProgressBar()
+        progress.setMinimum(0)
+        progress.setMaximum(100)
+        progress.setValue(percentage)
+        progress.setTextVisible(False)
+        progress.setFixedHeight(12)
+        
+        # Different gradient colors based on rank
+        if row == 0:  # Gold/top
+            gradient = "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #FFD700, stop:0.5 #FFA500, stop:1 #FF6B35)"
+        elif row == 1:  # Silver
+            gradient = "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #C0C0C0, stop:0.5 #A8A8A8, stop:1 #909090)"
+        elif row == 2:  # Bronze
+            gradient = "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #CD7F32, stop:0.5 #B8722D, stop:1 #A36628)"
+        else:  # Others - cyan/teal
+            gradient = "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #06B6D4, stop:0.5 #0891B2, stop:1 #0E7490)"
+        
+        progress.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: #1F2937;
+                border: none;
+                border-radius: 6px;
+            }}
+            QProgressBar::chunk {{
+                background: {gradient};
+                border-radius: 6px;
+            }}
+        """)
+        
+        return progress
     
     def _on_delete_clicked(self, task_index: int):
         """Handle delete button click"""
@@ -1028,9 +1088,37 @@ class ExportButtonWidget(QWidget):
     
     def _setup_ui(self):
         layout = QVBoxLayout()
+        layout.setContentsMargins(0, 10, 0, 0)
         
-        # Quick export button (primary)
-        self.quick_export_button = QPushButton('Export to Excel')
+        # Quick export button (primary) with enhanced styling
+        self.quick_export_button = QPushButton('📊  Export to Excel')
+        self.quick_export_button.setMinimumHeight(42)
+        self.quick_export_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.quick_export_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #10B981, stop:0.5 #059669, stop:1 #047857);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: bold;
+                letter-spacing: 0.5px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #34D399, stop:0.5 #10B981, stop:1 #059669);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #059669, stop:0.5 #047857, stop:1 #065F46);
+            }
+            QPushButton:disabled {
+                background: #374151;
+                color: #6B7280;
+            }
+        """)
         self.quick_export_button.clicked.connect(self._quick_export)
         layout.addWidget(self.quick_export_button)
         
@@ -1102,19 +1190,62 @@ class PlotResultsCoordinator(QWidget):
     
     def _setup_ui(self):
         layout = QVBoxLayout()
-        layout.setContentsMargins(5, 0, 5, 5)
+        layout.setContentsMargins(10, 5, 10, 10)
+        layout.setSpacing(8)
         
-        title_label = QLabel("Priority plot")
-        title_label.setStyleSheet("color: #C9D2DD; font-weight: 600; padding: 6px 0px; font-size: 12px;")
-        layout.addWidget(title_label)
+        # Title removed - the plot has its own title now
 
+        # Quick add input with enhanced styling
         quick_add_layout = QHBoxLayout()
+        quick_add_layout.setSpacing(8)
+        
         self.quick_task_input = QLineEdit()
         self.quick_task_input.setPlaceholderText("Add a task")
+        self.quick_task_input.setMinimumHeight(38)
+        self.quick_task_input.setStyleSheet("""
+            QLineEdit {
+                background: #1F2937;
+                border: 2px solid #374151;
+                border-radius: 8px;
+                padding: 8px 14px;
+                color: #E5E7EB;
+                font-size: 13px;
+            }
+            QLineEdit:focus {
+                border: 2px solid #10B981;
+                background: #1F2937;
+            }
+            QLineEdit::placeholder {
+                color: #6B7280;
+            }
+        """)
         self.quick_task_input.returnPressed.connect(self._add_quick_task)
         quick_add_layout.addWidget(self.quick_task_input)
 
         self.quick_add_button = QPushButton("Add")
+        self.quick_add_button.setMinimumHeight(38)
+        self.quick_add_button.setMinimumWidth(80)
+        self.quick_add_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.quick_add_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #10B981, stop:1 #059669);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #34D399, stop:1 #10B981);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #059669, stop:1 #047857);
+            }
+        """)
         self.quick_add_button.clicked.connect(self._add_quick_task)
         quick_add_layout.addWidget(self.quick_add_button)
         layout.addLayout(quick_add_layout)

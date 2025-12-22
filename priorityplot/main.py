@@ -189,7 +189,7 @@ def main():
     main_window = QMainWindow()
     widget = PriorityPlotWidget()
     main_window.setCentralWidget(widget)
-    main_window.setWindowTitle('priplot')
+    main_window.setWindowTitle('Priority Plot  •  Task Prioritization Made Simple')
     
     # Make window scalable and responsive to different screen sizes
     # Get screen geometry to set appropriate default size
