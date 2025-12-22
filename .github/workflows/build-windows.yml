@@ -39,10 +39,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: priorityplot-windows
-          path: dist/**
+          path: |
+            dist/installers/*
+            dist/priorityplot*
 
       - name: Upload release assets
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/**
+          files: |
+            dist/installers/*
+            dist/priorityplot*

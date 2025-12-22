@@ -9,7 +9,7 @@ ARCH="$(dpkg --print-architecture)"
 
 DIST_DIR="$ROOT_DIR/dist"
 INSTALLER_DIR="$DIST_DIR/installers"
-PKGROOT="$DIST_DIR/pkgroot"
+PKGROOT="$ROOT_DIR/build/pkgroot"
 
 APP_DIR="$PKGROOT/usr/lib/priorityplot"
 BIN_DIR="$PKGROOT/usr/bin"
