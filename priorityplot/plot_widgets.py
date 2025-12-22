@@ -1104,7 +1104,7 @@ class PlotResultsCoordinator(QWidget):
         layout.setContentsMargins(5, 0, 5, 5)
         
         title_label = QLabel("Priority plot")
-        title_label.setStyleSheet("color: #E5E7EB; font-weight: 600; padding: 6px 0px; font-size: 13px;")
+        title_label.setStyleSheet("color: #C9D2DD; font-weight: 600; padding: 6px 0px; font-size: 12px;")
         layout.addWidget(title_label)
         
         # Splitter for plot and results
@@ -1120,7 +1120,7 @@ class PlotResultsCoordinator(QWidget):
         results_layout = QVBoxLayout()
         
         results_title = QLabel("Ranking")
-        results_title.setStyleSheet("color: #E5E7EB; font-weight: 600; font-size: 13px; padding: 6px 0px;")
+        results_title.setStyleSheet("color: #C9D2DD; font-weight: 600; font-size: 12px; padding: 6px 0px;")
         results_layout.addWidget(results_title)
         
         # Results table

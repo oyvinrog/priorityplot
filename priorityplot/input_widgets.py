@@ -137,7 +137,7 @@ class TaskInputCoordinator(QWidget):
         
         # Header
         header_label = QLabel("Tasks")
-        header_label.setStyleSheet("color: #F3F4F6; font-weight: 600; font-size: 18px; padding: 12px 8px 8px 8px;")
+        header_label.setStyleSheet("color: #E6EAF0; font-weight: 600; font-size: 17px; padding: 10px 6px 6px 6px;")
         layout.addWidget(header_label)
         
         # Task input field
@@ -151,14 +151,14 @@ class TaskInputCoordinator(QWidget):
         
         # Task list
         list_label = QLabel("Task list")
-        list_label.setStyleSheet("color: #E5E7EB; font-weight: 600; font-size: 13px; margin-top: 16px; margin-bottom: 6px;")
+        list_label.setStyleSheet("color: #C9D2DD; font-weight: 600; font-size: 12px; margin-top: 14px; margin-bottom: 6px;")
         layout.addWidget(list_label)
         
         self.task_table = TaskInputTable()
         layout.addWidget(self.task_table)
         
         # Show results button
-        self.show_results_button = QPushButton("View Plot")
+        self.show_results_button = QPushButton("Open Plot")
         self.show_results_button.clicked.connect(self.show_results_requested.emit)
         layout.addWidget(self.show_results_button)
         self.show_results_button.hide()

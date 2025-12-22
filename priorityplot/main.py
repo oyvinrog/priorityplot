@@ -22,37 +22,37 @@ def main():
     # Set simple, modern color scheme
     app.setStyle("Fusion")
     palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor(17, 20, 23))
+    palette.setColor(QPalette.ColorRole.Window, QColor(15, 17, 21))
     palette.setColor(QPalette.ColorRole.WindowText, QColor(229, 231, 235))
-    palette.setColor(QPalette.ColorRole.Base, QColor(22, 26, 31))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(30, 34, 40))
-    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(22, 26, 31))
+    palette.setColor(QPalette.ColorRole.Base, QColor(20, 24, 30))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(26, 31, 38))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(20, 24, 30))
     palette.setColor(QPalette.ColorRole.ToolTipText, QColor(229, 231, 235))
     palette.setColor(QPalette.ColorRole.Text, QColor(229, 231, 235))
-    palette.setColor(QPalette.ColorRole.Button, QColor(42, 47, 54))
+    palette.setColor(QPalette.ColorRole.Button, QColor(34, 39, 46))
     palette.setColor(QPalette.ColorRole.ButtonText, QColor(229, 231, 235))
     palette.setColor(QPalette.ColorRole.BrightText, QColor(248, 113, 113))
-    palette.setColor(QPalette.ColorRole.Link, QColor(59, 130, 246))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(59, 130, 246))
+    palette.setColor(QPalette.ColorRole.Link, QColor(34, 197, 181))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(34, 197, 181))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
     
     # Set simplified stylesheet for a cleaner UI
     app.setStyleSheet("""
         QMainWindow {
-            background-color: #111417;
+            background-color: #0F1115;
         }
         
         QTabWidget::pane {
             border: 1px solid #262B32;
-            background-color: #111417;
+            background-color: #0F1115;
             border-radius: 6px;
         }
         
         QTabBar::tab {
-            background: #1A1F25;
-            color: #B0B7C3;
-            padding: 8px 18px;
+            background: #171B22;
+            color: #B5BDC9;
+            padding: 7px 16px;
             border: 1px solid #262B32;
             border-bottom: none;
             border-top-left-radius: 6px;
@@ -63,47 +63,47 @@ def main():
         }
         
         QTabBar::tab:selected {
-            background: #262B32;
+            background: #1D232B;
             color: #FFFFFF;
         }
         
         QTabBar::tab:hover:!selected {
-            background: #20252C;
-            color: #D7DCE4;
+            background: #1B2027;
+            color: #DCE1E8;
         }
         
         QPushButton {
-            background: #2F6FED;
+            background: #1FAE9B;
             color: #FFFFFF;
             border: none;
-            padding: 8px 16px;
+            padding: 8px 14px;
             border-radius: 6px;
-            min-width: 90px;
+            min-width: 84px;
             font-weight: 600;
             font-size: 12px;
         }
         
         QPushButton:hover {
-            background: #3F7CFF;
+            background: #23C3AE;
         }
         
         QPushButton:pressed {
-            background: #2A64D6;
+            background: #189686;
         }
         
         QLineEdit {
             padding: 8px 10px;
             border: 1px solid #2A2F36;
             border-radius: 6px;
-            background-color: #1A1F25;
+            background-color: #171B22;
             color: #E5E7EB;
             font-size: 12px;
-            selection-background-color: #3F7CFF;
+            selection-background-color: #23C3AE;
         }
         
         QLineEdit:focus {
-            border: 1px solid #3F7CFF;
-            background-color: #1F242B;
+            border: 1px solid #23C3AE;
+            background-color: #1B2027;
         }
         
         QLabel {
@@ -112,7 +112,7 @@ def main():
         
         QTableWidget {
             background-color: #12161C;
-            alternate-background-color: #1A1F25;
+            alternate-background-color: #171B22;
             color: #E5E7EB;
             gridline-color: #2A2F36;
             border: 1px solid #2A2F36;
@@ -125,21 +125,21 @@ def main():
         }
         
         QTableWidget::item:selected {
-            background-color: #2F6FED;
+            background-color: #1FAE9B;
             color: #FFFFFF;
         }
         
         QHeaderView::section {
-            background: #1A1F25;
-            color: #CFD6DF;
-            padding: 8px;
+            background: #171B22;
+            color: #CCD3DD;
+            padding: 7px;
             border: 1px solid #2A2F36;
             font-weight: 600;
             font-size: 11px;
         }
         
         QToolTip {
-            background-color: #1A1F25;
+            background-color: #171B22;
             color: #E5E7EB;
             border: 1px solid #2A2F36;
             border-radius: 6px;
@@ -162,7 +162,27 @@ def main():
         }
         
         QSplitter::handle:hover {
-            background-color: #3F7CFF;
+            background-color: #23C3AE;
+        }
+
+        QScrollBar:vertical {
+            background: #101318;
+            width: 10px;
+            margin: 2px;
+        }
+
+        QScrollBar::handle:vertical {
+            background: #2A313A;
+            border-radius: 5px;
+            min-height: 24px;
+        }
+
+        QScrollBar::handle:vertical:hover {
+            background: #37404A;
+        }
+
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            height: 0px;
         }
     """)
     
