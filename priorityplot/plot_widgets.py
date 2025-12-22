@@ -1,7 +1,7 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, 
-                             QTableWidgetItem, QLabel, QMessageBox, QAbstractItemView, 
-                             QHeaderView, QInputDialog, QSplitter, QApplication, QLineEdit)
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThread, QPoint, QMimeData
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QTableWidget,
+                             QTableWidgetItem, QLabel, QMessageBox, QAbstractItemView,
+                             QHeaderView, QSplitter, QApplication)
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPoint, QMimeData
 from PyQt6.QtGui import QColor, QFont, QDrag, QPixmap, QPainter, QFontMetrics, QCursor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -96,10 +96,10 @@ class InteractivePlotWidget(QWidget):
             labelpad=LayoutConstants.LABEL_PAD
         )
         self.ax.set_title(
-            'Priority Matrix  •  Click to highlight  •  🆕 New tasks in green',
+            'Priority Plot',
             color=ColorPalette.TEXT_SECONDARY,
-            fontsize=SizeConstants.FONT_XXLARGE,
-            fontweight='700',
+            fontsize=SizeConstants.FONT_XLARGE,
+            fontweight='600',
             pad=LayoutConstants.LABEL_PAD_LARGE
         )
         
@@ -231,7 +231,7 @@ class InteractivePlotWidget(QWidget):
         # Add text label
         highlight_text = self.ax.text(
             task.value, task.time + 0.3,
-            f"🎯 {task.task[:20]}{'...' if len(task.task) > 20 else ''}",
+            f"{task.task[:20]}{'...' if len(task.task) > 20 else ''}",
             ha='center', va='bottom',
             fontsize=SizeConstants.FONT_NORMAL,
             fontweight='bold',
@@ -1017,32 +1017,6 @@ class DraggableTaskTable(QTableWidget):
         drag.setPixmap(pixmap)
         drag.setHotSpot(QPoint(pixmap_width // 2, pixmap_height // 2))
 
-class ExportWorker(QThread):
-    """Single responsibility: Handle Excel export in background following SRP"""
-    
-    finished = pyqtSignal(str)
-    error = pyqtSignal(str)
-    progress = pyqtSignal(str)
-    
-    def __init__(self, task_list: List[Task], file_path: str):
-        super().__init__()
-        self.task_list = task_list
-        self.file_path = file_path
-        
-    def run(self):
-        try:
-            self.progress.emit("Creating Excel workbook...")
-            success = ExcelExporter.export_tasks_to_excel(self.task_list, self.file_path)
-            
-            if success:
-                self.progress.emit("Export completed!")
-                self.finished.emit(self.file_path)
-            else:
-                self.error.emit("Failed to export tasks to Excel")
-                
-        except Exception as e:
-            self.error.emit(str(e))
-
 class ExportButtonWidget(QWidget):
     """Single responsibility: Handle export UI and coordination following SRP
     Implements IExportService protocol methods"""
@@ -1050,63 +1024,15 @@ class ExportButtonWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._tasks = []
-        self._export_worker = None
         self._setup_ui()
     
     def _setup_ui(self):
         layout = QVBoxLayout()
         
         # Quick export button (primary)
-        self.quick_export_button = QPushButton('📊 Export to Excel')
+        self.quick_export_button = QPushButton('Export to Excel')
         self.quick_export_button.clicked.connect(self._quick_export)
-        self.quick_export_button.setToolTip("💾 Save to Downloads folder - RECOMMENDED")
-        self.quick_export_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #10B981, stop:1 #059669);
-                color: white;
-                border: none;
-                padding: 14px 20px;
-                border-radius: 10px;
-                font-weight: 700;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #34D399, stop:1 #10B981);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #059669, stop:1 #047857);
-            }
-        """)
         layout.addWidget(self.quick_export_button)
-        
-        # Custom location export (secondary)
-        self.export_button = QPushButton('📁 Custom Location')
-        self.export_button.clicked.connect(self._custom_export)
-        self.export_button.setToolTip("💾 Choose save location")
-        self.export_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #3B82F6, stop:1 #2563EB);
-                color: white;
-                border: none;
-                padding: 10px 16px;
-                border-radius: 8px;
-                font-weight: 600;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #60A5FA, stop:1 #3B82F6);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #2563EB, stop:1 #1D4ED8);
-            }
-        """)
-        layout.addWidget(self.export_button)
         
         self.setLayout(layout)
     
@@ -1123,130 +1049,41 @@ class ExportButtonWidget(QWidget):
         self._tasks = tasks
     
     def _show_export_success(self, title: str, message: str, file_path: str):
-        """Show export success message with copy to clipboard option"""
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setWindowTitle(title)
-        msg_box.setText(message)
-        
-        # Add custom buttons
-        copy_button = msg_box.addButton("📋 Copy Path", QMessageBox.ButtonRole.ActionRole)
-        ok_button = msg_box.addButton("OK", QMessageBox.ButtonRole.AcceptRole)
-        
-        msg_box.exec()
-        
-        # Check which button was clicked
-        if msg_box.clickedButton() == copy_button:
-            clipboard = QApplication.clipboard()
-            clipboard.setText(file_path)
-            # Show a quick confirmation
-            QMessageBox.information(self, "✅ Copied!", 
-                                  f"📋 Path copied to clipboard:\n\n{file_path}")
+        """Show export success message"""
+        QMessageBox.information(self, title, message)
     
     def _quick_export(self):
         """Quick export to default location"""
         if not self._tasks:
-            QMessageBox.warning(self, "❌ No Data", "There are no tasks to export!")
+            QMessageBox.warning(self, "No Data", "There are no tasks to export.")
             return
             
         try:
-            self.quick_export_button.setText('⏳ Creating Excel file...')
+            self.quick_export_button.setText('Exporting...')
             self.quick_export_button.setEnabled(False)
             
             save_dir = self.get_default_export_path()
             filename = ExcelExporter.generate_filename()
             file_path = os.path.join(save_dir, filename)
             
-            self.quick_export_button.setText('⏳ Exporting...')
             success = self.export_tasks(self._tasks, file_path)
             
-            self.quick_export_button.setText('📊 Export to Excel (Quick)')
+            self.quick_export_button.setText('Export to Excel')
             self.quick_export_button.setEnabled(True)
             
             if success:
-                folder_name = os.path.basename(save_dir)
                 self._show_export_success(
-                    "✅ Quick Export Successful!",
-                    f"🎉 Exported to {folder_name} folder!\n\n"
-                    f"📁 File: {filename}",
+                    "Export Successful",
+                    f"Exported to {save_dir}\n\nFile: {filename}",
                     file_path
                 )
             else:
-                QMessageBox.critical(self, "❌ Export Error", "Failed to export tasks.")
+                QMessageBox.critical(self, "Export Error", "Failed to export tasks.")
                 
         except Exception as e:
-            self.quick_export_button.setText('📊 Export to Excel (Quick)')
+            self.quick_export_button.setText('Export to Excel')
             self.quick_export_button.setEnabled(True)
-            QMessageBox.critical(self, "❌ Export Error", f"Export failed:\n{str(e)}")
-    
-    def _custom_export(self):
-        """Export to custom location using input dialog"""
-        if not self._tasks:
-            QMessageBox.warning(self, "❌ No Data", "There are no tasks to export!")
-            return
-            
-        default_filename = ExcelExporter.generate_filename()
-        default_path = self.get_default_export_path()
-        
-        folder_path, ok = QInputDialog.getText(
-            self, "📁 Choose Export Folder",
-            f"💾 Enter folder path to save '{default_filename}':\n\n"
-            f"💡 Leave empty to use: {default_path}",
-            text=default_path
-        )
-        
-        if not ok:
-            return
-            
-        if not folder_path.strip():
-            folder_path = default_path
-        else:
-            folder_path = os.path.expanduser(folder_path.strip())
-        
-        # Validate and create if needed
-        try:
-            if not os.path.exists(folder_path):
-                reply = QMessageBox.question(
-                    self, "📁 Create Folder?", 
-                    f"Create folder?\n{folder_path}",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                if reply == QMessageBox.StandardButton.Yes:
-                    os.makedirs(folder_path, exist_ok=True)
-                else:
-                    return
-            
-            file_path = os.path.join(folder_path, default_filename)
-            
-            # Start worker thread
-            self.export_button.setText('⏳ Starting export...')
-            self.export_button.setEnabled(False)
-            
-            self._export_worker = ExportWorker(self._tasks, file_path)
-            self._export_worker.finished.connect(self._on_export_finished)
-            self._export_worker.error.connect(self._on_export_error)
-            self._export_worker.progress.connect(self._on_export_progress)
-            self._export_worker.start()
-            
-        except Exception as e:
-            QMessageBox.warning(self, "❌ Invalid Path", f"Invalid path:\n{str(e)}")
-    
-    def _on_export_finished(self, file_path: str):
-        self.export_button.setText('📁 Export to Custom Location')
-        self.export_button.setEnabled(True)
-        self._show_export_success(
-            "✅ Export Successful!",
-            f"🎉 Exported successfully!\n\n📁 {file_path}",
-            file_path
-        )
-    
-    def _on_export_error(self, error_message: str):
-        self.export_button.setText('📁 Export to Custom Location')
-        self.export_button.setEnabled(True)
-        QMessageBox.critical(self, "❌ Export Error", f"Export failed:\n{error_message}")
-    
-    def _on_export_progress(self, message: str):
-        self.export_button.setText(f"⏳ {message}")
+            QMessageBox.critical(self, "Export Error", f"Export failed:\n{str(e)}")
 
 class PlotResultsCoordinator(QWidget):
     """Single responsibility: Coordinate plot and results display following SRP"""
@@ -1254,7 +1091,6 @@ class PlotResultsCoordinator(QWidget):
     task_selected = pyqtSignal(int)  # task_index
     task_updated = pyqtSignal(int, float, float)  # task_index, value, time
     task_drag_started = pyqtSignal(int, str)  # task_index, task_data (forwarded from graph and table)
-    task_added = pyqtSignal(str)  # task_name (when new task is added)
     task_deleted = pyqtSignal(int)  # task_index (when task is deleted)
     
     def __init__(self, parent=None):
@@ -1267,93 +1103,9 @@ class PlotResultsCoordinator(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 0, 5, 5)
         
-        # Header with updated instructions
-        header_layout = QHBoxLayout()
-        self.priority_header = QLabel("Drag tasks to prioritize  •  Top 3 shown below  •  🆕 New tasks in green")
-        self.priority_header.setStyleSheet("color: #F3F4F6; font-weight: 700; padding: 8px; font-size: 14px; letter-spacing: 0.3px;")
-        header_layout.addWidget(self.priority_header)
-        
-        # Clear "new" status button
-        self.clear_new_button = QPushButton("✓ Mark All Seen")
-        self.clear_new_button.setToolTip("Clear the 'new' status from all tasks")
-        self.clear_new_button.clicked.connect(self._clear_new_status)
-        self.clear_new_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #4B5563, stop:1 #374151);
-                color: white;
-                border: none;
-                padding: 8px 14px;
-                border-radius: 8px;
-                font-size: 11px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #6B7280, stop:1 #4B5563);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #374151, stop:1 #1F2937);
-            }
-        """)
-        header_layout.addWidget(self.clear_new_button)
-        header_layout.addStretch()
-        
-        layout.addLayout(header_layout)
-        
-        # Quick add task field
-        quick_add_layout = QHBoxLayout()
-        self.quick_task_input = QLineEdit()
-        self.quick_task_input.setPlaceholderText("➕ Quick add a new task...")
-        self.quick_task_input.setToolTip("💡 Type a task name and press Enter to add it!")
-        self.quick_task_input.returnPressed.connect(self._add_quick_task)
-        self.quick_task_input.setStyleSheet("""
-            QLineEdit {
-                padding: 12px 16px;
-                font-size: 13px;
-                border-radius: 10px;
-                border: 2px solid #2D3139;
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #1F2228, stop:1 #181A1F);
-                color: #E5E7EB;
-                selection-background-color: #4F46E5;
-            }
-            QLineEdit:focus {
-                border: 2px solid #10B981;
-                background: #252830;
-            }
-            QLineEdit:hover {
-                border: 2px solid #3F4451;
-            }
-        """)
-        quick_add_layout.addWidget(self.quick_task_input)
-        
-        self.quick_add_button = QPushButton("➕ Add")
-        self.quick_add_button.clicked.connect(self._add_quick_task)
-        self.quick_add_button.setToolTip("Add new task")
-        self.quick_add_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #10B981, stop:1 #059669);
-                color: white;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 10px;
-                font-weight: 700;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #34D399, stop:1 #10B981);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #059669, stop:1 #047857);
-            }
-        """)
-        quick_add_layout.addWidget(self.quick_add_button)
-        layout.addLayout(quick_add_layout)
+        title_label = QLabel("Priority plot")
+        title_label.setStyleSheet("color: #E5E7EB; font-weight: 600; padding: 6px 0px; font-size: 13px;")
+        layout.addWidget(title_label)
         
         # Splitter for plot and results
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -1367,30 +1119,9 @@ class PlotResultsCoordinator(QWidget):
         results_widget.setMaximumHeight(500)
         results_layout = QVBoxLayout()
         
-        # Header
-        live_header = QLabel("🏆 Live Priority Ranking")
-        live_header.setStyleSheet("""
-            color: #FFFFFF; font-weight: 700; font-size: 17px; 
-            padding: 12px 16px;
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 #6366F1, stop:1 #4F46E5);
-            border-radius: 10px; margin-bottom: 8px;
-            letter-spacing: 0.5px;
-        """)
-        results_layout.addWidget(live_header)
-        
-        # Enhanced drag instruction
-        drag_instruction = QLabel("✨ Drag tasks from graph or table to adjust priorities")
-        drag_instruction.setStyleSheet("""
-            color: #34D399; font-weight: 600; font-size: 12px; 
-            padding: 10px 14px;
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #1F2937, stop:1 #111827);
-            border: 2px solid #10B981; border-radius: 10px; 
-            margin-bottom: 10px; letter-spacing: 0.3px;
-        """)
-        drag_instruction.setWordWrap(True)
-        results_layout.addWidget(drag_instruction)
+        results_title = QLabel("Ranking")
+        results_title.setStyleSheet("color: #E5E7EB; font-weight: 600; font-size: 13px; padding: 6px 0px;")
+        results_layout.addWidget(results_title)
         
         # Results table
         self.results_table = DraggableTaskTable(self)
@@ -1432,35 +1163,12 @@ class PlotResultsCoordinator(QWidget):
     
     def _on_task_drag_started(self, task_index: int, task_data: str):
         """Handle task drag started from either graph or table"""
-        print(f"🎯 Task drag started from coordinator: {task_index} - {task_data}")
         self.task_drag_started.emit(task_index, task_data)
-    
-    def _add_quick_task(self):
-        """Handle quick task addition"""
-        task_text = self.quick_task_input.text().strip()
-        if task_text:
-            self.task_added.emit(task_text)
-            self.quick_task_input.clear()
-            self.quick_task_input.setPlaceholderText("✅ Task added! Add another?")
-            # Reset placeholder after 2 seconds
-            QTimer.singleShot(2000, lambda: self.quick_task_input.setPlaceholderText("➕ Quick add a new task while viewing results..."))
     
     def _on_task_delete_requested(self, task_index: int):
         """Handle task deletion request from results table or plot"""
         if 0 <= task_index < len(self._tasks):
             self.task_deleted.emit(task_index)
-    
-    def _clear_new_status(self):
-        """Clear the 'new' status from all tasks"""
-        # Clear from all tasks
-        for task in self._tasks:
-            task.mark_as_seen()
-        
-        # Clear from state manager
-        self.plot_widget._state_manager.clear_new_tasks()
-        
-        # Update display
-        self._update_displays()
     
     def set_tasks(self, tasks: List[Task]):
         """Set tasks for display"""

@@ -2,13 +2,12 @@
 # This maintains the original API while using the new SOLID-compliant structure
 
 from .main_plot_widget import PriorityPlotWidget
-from .plot_widgets import DraggableTaskTable as DraggableTableWidget, ExportWorker as ExcelExportWorker
+from .plot_widgets import DraggableTaskTable as DraggableTableWidget
 
 # Re-export the main widget for backward compatibility
 __all__ = [
     'PriorityPlotWidget',
-    'DraggableTableWidget',
-    'ExcelExportWorker'
+    'DraggableTableWidget'
 ]
 
 # The original large PriorityPlotWidget class has been refactored into:
