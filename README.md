@@ -114,6 +114,23 @@ pip install -r requirements.txt
 python -m priorityplot.main
 ```
 
+### Build Executables (PyInstaller)
+
+```bash
+python3 -m venv build_env
+source build_env/bin/activate
+pip install -r requirements.txt
+pip install pyinstaller
+./build_pyinstaller.sh
+```
+
+The executable will be created in `dist/` (for example `dist/priorityplot` or `dist/priorityplot.exe`).
+
+### GitHub Actions Releases
+
+Releases automatically build executables for macOS, Windows, and Linux via `.github/workflows/build-executables.yml`.
+Artifacts are attached to the GitHub Release and also available in the workflow run.
+
 ### Getting Started
 
 3. **Add your tasks** in the "Input Goals" tab
