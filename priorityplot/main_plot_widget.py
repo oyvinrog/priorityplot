@@ -115,28 +115,20 @@ class PriorityPlotWidget(QWidget):
         self._task_coordinator.update_task_priority(task_index, value, time)
         self._update_all_displays()
     
-    def _on_task_added_from_results(self, task_name: str):
-        """Handle task addition from results view"""
-        try:
-            # Create task with is_new=True flag
-            from .model import TaskValidator
-            new_task = TaskValidator.create_validated_task(task_name)
-            new_task.is_new = True  # Mark as new for visual indication
-            self._task_list.append(new_task)
-            
-            # Mark in state manager for plot highlighting
-            new_task_index = len(self._task_list) - 1
-            self.plot_coordinator.plot_widget._state_manager.mark_task_new(new_task_index)
-            
-            self._update_all_displays()
-        except ValueError as e:
-            QMessageBox.warning(self, "❌ Invalid Task", f"Could not add task: {str(e)}")
-    
     def _on_task_deleted_from_results(self, task_index: int):
         """Handle task deletion from results view"""
         if 0 <= task_index < len(self._task_list):
             del self._task_list[task_index]
             self._update_all_displays()
+
+    def _on_task_added_from_results(self, task_name: str):
+        """Handle task addition from results view"""
+        try:
+            new_task = TaskValidator.create_validated_task(task_name)
+            self._task_list.append(new_task)
+            self._update_all_displays()
+        except ValueError as e:
+            QMessageBox.warning(self, "Invalid Task", f"Could not add task:\n{str(e)}")
     
     def _show_results(self):
         """Transition to results view"""
@@ -156,46 +148,6 @@ class PriorityPlotWidget(QWidget):
     def _update_all_displays(self):
         """Update all display components"""
         self.plot_coordinator.set_tasks(self._task_list)
-    
-    def _show_welcome_message(self):
-        """Show welcome message for new users"""
-        main_text = "🎉 <b>Welcome to PriPlot!</b>"
-        
-        detailed_text = """Transform your task management with smart priority visualization!<br><br>
-<b>🚀 New User-Controlled Experience:</b><br>
-• Choose "🧪 Try Sample Tasks" for instant exploration<br>
-• Or "📋 Import List" to paste your own tasks<br>
-• Add tasks manually with the input field<br>
-• <b>Click "Show Results" when you're ready to prioritize!</b><br><br>
-<b>💡 You're in control!</b><br>
-Add as many tasks as you want, then click the green "Show Results" button when you're ready to see your priority chart.<br><br>
-Ready to boost your productivity? 🎯"""
-        
-        msg = QMessageBox(self)
-        msg.setWindowTitle("🎯 Welcome to PriPlot!")
-        msg.setText(main_text)
-        msg.setInformativeText(detailed_text)
-        msg.setTextFormat(Qt.TextFormat.RichText)
-        msg.setStyleSheet("""
-            QMessageBox {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #1F2228, stop:1 #181A1F);
-                color: #E5E7EB;
-                border: 2px solid #4F46E5;
-                border-radius: 12px;
-            }
-            QMessageBox QLabel {
-                color: #E5E7EB;
-                font-size: 13px;
-                min-width: 500px;
-                max-width: 600px;
-            }
-            QMessageBox QPushButton {
-                min-width: 100px;
-                padding: 10px 16px;
-            }
-        """)
-        msg.exec()
     
     # Implementation of IWidgetEventHandler interface
     def on_task_selected(self, task_index: int) -> None:

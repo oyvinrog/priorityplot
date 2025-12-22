@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PriPlot — Interactive Task Priority Visualization</title>
+    <meta name="description" content="PriPlot helps you visualize tasks on a value vs time plot so you can focus on the highest impact work.">
+    <meta name="theme-color" content="#11110f">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #13110f;
+        --sand: #f6f2ea;
+        --mist: #e6e1d6;
+        --accent: #1f8f77;
+        --accent-deep: #136452;
+        --sun: #f4b942;
+        --clay: #b86b3f;
+        --shadow: rgba(19, 17, 15, 0.18);
+        --radius: 18px;
+        --max: 1100px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Space Grotesk", "Segoe UI", sans-serif;
+        background: var(--sand);
+        color: var(--ink);
+        line-height: 1.5;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      img {
+        max-width: 100%;
+        display: block;
+      }
+
+      .page {
+        position: relative;
+        overflow: hidden;
+        min-height: 100vh;
+      }
+
+      .backdrop {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 12% 18%, rgba(31, 143, 119, 0.22), transparent 55%),
+          radial-gradient(circle at 82% 12%, rgba(244, 185, 66, 0.24), transparent 48%),
+          radial-gradient(circle at 72% 75%, rgba(184, 107, 63, 0.18), transparent 52%),
+          linear-gradient(180deg, #fbf8f2 0%, #f3eee4 100%);
+        z-index: 0;
+      }
+
+      .backdrop::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(
+          120deg,
+          rgba(19, 17, 15, 0.04) 0px,
+          rgba(19, 17, 15, 0.04) 1px,
+          transparent 1px,
+          transparent 9px
+        );
+        opacity: 0.3;
+      }
+
+      .container {
+        position: relative;
+        z-index: 1;
+        max-width: var(--max);
+        margin: 0 auto;
+        padding: 28px 24px 80px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 60px;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .logo-mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--accent), var(--sun));
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 700;
+        box-shadow: 0 10px 20px rgba(31, 143, 119, 0.25);
+      }
+
+      nav {
+        display: flex;
+        gap: 18px;
+        font-size: 0.95rem;
+        font-weight: 500;
+      }
+
+      nav a {
+        padding-bottom: 6px;
+        border-bottom: 2px solid transparent;
+        transition: border-color 0.2s ease;
+      }
+
+      nav a:hover {
+        border-color: var(--accent);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 36px;
+        align-items: center;
+      }
+
+      .hero h1 {
+        font-size: clamp(2.4rem, 4vw, 3.6rem);
+        margin: 0 0 18px;
+        line-height: 1.05;
+      }
+
+      .hero p {
+        font-size: 1.05rem;
+        max-width: 520px;
+        margin: 0 0 26px;
+        color: #2f2c28;
+      }
+
+      .cta-group {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 14px 22px;
+        border-radius: 999px;
+        font-weight: 600;
+        border: 2px solid transparent;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .btn.primary {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 16px 30px rgba(31, 143, 119, 0.25);
+      }
+
+      .btn.secondary {
+        background: #fff;
+        border-color: var(--mist);
+        color: var(--ink);
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+      }
+
+      .hero-card {
+        background: #fff;
+        border-radius: var(--radius);
+        padding: 20px;
+        box-shadow: 0 24px 45px var(--shadow);
+        position: relative;
+      }
+
+      .hero-card::before {
+        content: "";
+        position: absolute;
+        inset: -14px;
+        border-radius: calc(var(--radius) + 12px);
+        background: linear-gradient(135deg, rgba(31, 143, 119, 0.15), rgba(244, 185, 66, 0.18));
+        z-index: -1;
+      }
+
+      .hero-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(31, 143, 119, 0.12);
+        color: var(--accent-deep);
+        margin-bottom: 16px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin: 52px 0;
+      }
+
+      .stat {
+        background: #fff;
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 15px 30px rgba(19, 17, 15, 0.08);
+      }
+
+      .stat span {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #5f5b54;
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 1.5rem;
+        margin-top: 8px;
+      }
+
+      .section {
+        margin: 64px 0;
+      }
+
+      .section h2 {
+        font-size: clamp(1.8rem, 3vw, 2.4rem);
+        margin-bottom: 18px;
+      }
+
+      .section p {
+        max-width: 720px;
+        color: #3a3631;
+      }
+
+      .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 18px;
+        margin-top: 28px;
+      }
+
+      .feature-card {
+        padding: 20px;
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #efe9dc;
+        box-shadow: 0 12px 28px rgba(19, 17, 15, 0.08);
+      }
+
+      .feature-card h3 {
+        margin: 8px 0 10px;
+        font-size: 1.1rem;
+      }
+
+      .feature-card p {
+        margin: 0;
+        font-size: 0.95rem;
+        color: #4b4741;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-top: 28px;
+      }
+
+      .step {
+        background: linear-gradient(135deg, rgba(31, 143, 119, 0.08), rgba(244, 185, 66, 0.08));
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid rgba(31, 143, 119, 0.15);
+      }
+
+      .step span {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.9rem;
+        color: var(--accent-deep);
+      }
+
+      .step h3 {
+        margin: 10px 0 8px;
+        font-size: 1.1rem;
+      }
+
+      .inline-code {
+        font-family: "IBM Plex Mono", monospace;
+        background: #f1ece1;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+      }
+
+      .cta-panel {
+        background: var(--ink);
+        color: #f7f2e9;
+        border-radius: 24px;
+        padding: 36px;
+        display: grid;
+        gap: 18px;
+        align-items: center;
+      }
+
+      .cta-panel h2 {
+        margin: 0;
+        font-size: 2rem;
+      }
+
+      .cta-panel .btn.secondary {
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      footer {
+        margin-top: 64px;
+        color: #58544f;
+        font-size: 0.9rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(12px);
+        animation: fadeUp 0.8s ease forwards;
+      }
+
+      .reveal.delay-1 { animation-delay: 0.1s; }
+      .reveal.delay-2 { animation-delay: 0.2s; }
+      .reveal.delay-3 { animation-delay: 0.3s; }
+
+      @keyframes fadeUp {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 720px) {
+        header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        nav {
+          flex-wrap: wrap;
+          justify-content: flex-start;
+        }
+
+        .cta-group {
+          width: 100%;
+        }
+
+        .cta-panel {
+          padding: 28px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .reveal {
+          animation: none;
+          opacity: 1;
+          transform: none;
+        }
+
+        .btn {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="backdrop"></div>
+      <div class="container">
+        <header class="reveal">
+          <div class="logo">
+            <div class="logo-mark">P</div>
+            <div>
+              <div>PriPlot</div>
+              <small style="color:#5f5b54; font-weight:500;">Interactive Priority Plotter</small>
+            </div>
+          </div>
+          <nav>
+            <a href="#features">Features</a>
+            <a href="#workflow">Workflow</a>
+            <a href="#install">Install</a>
+            <a href="https://github.com/oyvinrog/priorityplot" target="_blank" rel="noopener">GitHub</a>
+          </nav>
+        </header>
+
+        <section class="hero">
+          <div>
+            <div class="hero-tag reveal delay-1">Value vs Time, instantly visualized</div>
+            <h1 class="reveal delay-2">Turn a messy task list into a clear priority map.</h1>
+            <p class="reveal delay-2">PriPlot helps you plot tasks by value and effort, so you can focus on the work that matters most. Drag tasks, see priorities update in real time, and schedule directly onto your calendar.</p>
+            <div class="cta-group reveal delay-3">
+              <a class="btn primary" href="#install">Get started</a>
+              <a class="btn secondary" href="https://pypi.org/project/priorityplot/" target="_blank" rel="noopener">PyPI package</a>
+            </div>
+            <p class="reveal delay-3" style="font-size:0.9rem; color:#605c56;">Available for Windows, macOS, and Linux. Python 3.8+.</p>
+          </div>
+          <div class="hero-card reveal delay-2">
+            <img src="assets/demo.gif" alt="PriPlot demo showing tasks plotted on a value vs time chart with drag and drop">
+          </div>
+        </section>
+
+        <section class="stats">
+          <div class="stat reveal delay-1">
+            <span>Priority Signal</span>
+            <strong>Value / Time</strong>
+          </div>
+          <div class="stat reveal delay-2">
+            <span>Interaction</span>
+            <strong>Drag + Drop</strong>
+          </div>
+          <div class="stat reveal delay-3">
+            <span>Output</span>
+            <strong>Excel Ready</strong>
+          </div>
+        </section>
+
+        <section id="features" class="section">
+          <h2 class="reveal">Everything you need to prioritize with confidence.</h2>
+          <p class="reveal delay-1">PriPlot pairs a value-time plot with a calendar and ranked task table. Keep your planning visual, interactive, and exportable.</p>
+          <div class="features">
+            <div class="feature-card reveal delay-1">
+              <h3>Interactive priority plot</h3>
+              <p>Drag tasks on the chart and watch their priority scores update live.</p>
+            </div>
+            <div class="feature-card reveal delay-2">
+              <h3>Calendar scheduling</h3>
+              <p>Drop tasks onto specific dates and assign start/end times with ease.</p>
+            </div>
+            <div class="feature-card reveal delay-3">
+              <h3>Bulk import</h3>
+              <p>Paste a list from your clipboard to populate tasks instantly.</p>
+            </div>
+            <div class="feature-card reveal delay-1">
+              <h3>Priority table</h3>
+              <p>Sort tasks automatically so high-impact work rises to the top.</p>
+            </div>
+            <div class="feature-card reveal delay-2">
+              <h3>Export to Excel</h3>
+              <p>Share your prioritized plan or keep records in spreadsheets.</p>
+            </div>
+            <div class="feature-card reveal delay-3">
+              <h3>Dark UI ready</h3>
+              <p>Designed for focus with a modern interface and readable contrast.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="workflow" class="section">
+          <h2 class="reveal">A workflow that turns ideas into action.</h2>
+          <p class="reveal delay-1">From a quick list to a scheduled plan in minutes. PriPlot keeps the flow simple and visual.</p>
+          <div class="steps">
+            <div class="step reveal delay-1">
+              <span>01</span>
+              <h3>Capture your tasks</h3>
+              <p>Add tasks manually, paste from the clipboard, or load test data.</p>
+            </div>
+            <div class="step reveal delay-2">
+              <span>02</span>
+              <h3>Plot and adjust</h3>
+              <p>Drag points to reflect the real value and time investment.</p>
+            </div>
+            <div class="step reveal delay-3">
+              <span>03</span>
+              <h3>Schedule and export</h3>
+              <p>Drop tasks onto the calendar and export to Excel when ready.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="install" class="section">
+          <h2 class="reveal">Install in minutes.</h2>
+          <p class="reveal delay-1">PriPlot runs as a desktop app. Install from PyPI or clone the repo to build locally.</p>
+          <div class="features">
+            <div class="feature-card reveal delay-1">
+              <h3>Quick install</h3>
+              <p><span class="inline-code">pip install priorityplot</span></p>
+            </div>
+            <div class="feature-card reveal delay-2">
+              <h3>Launch</h3>
+              <p><span class="inline-code">priorityplot</span></p>
+            </div>
+            <div class="feature-card reveal delay-3">
+              <h3>From source</h3>
+              <p><span class="inline-code">./run_priplot.sh</span> sets up everything.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="cta-panel reveal">
+          <div>
+            <h2>Plot your priorities, schedule with clarity.</h2>
+            <p>Download PriPlot and bring structure to your task planning workflow.</p>
+          </div>
+          <div class="cta-group">
+            <a class="btn primary" href="https://github.com/oyvinrog/priorityplot/releases" target="_blank" rel="noopener">Download releases</a>
+            <a class="btn secondary" href="https://github.com/oyvinrog/priorityplot" target="_blank" rel="noopener">View source</a>
+          </div>
+        </section>
+
+        <footer>
+          <span>Built for clear thinking. PriPlot is open source under the MIT License.</span>
+          <span>© PriPlot • Priority plotting for focused work.</span>
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>

@@ -19,102 +19,91 @@ def main():
         # If emoji font setup fails, continue without it
         pass
     
-    # Set modern color scheme - Professional design system
+    # Set simple, modern color scheme
     app.setStyle("Fusion")
     palette = QPalette()
-    # Rich dark background with subtle depth
-    palette.setColor(QPalette.ColorRole.Window, QColor(24, 26, 31))
+    palette.setColor(QPalette.ColorRole.Window, QColor(15, 17, 21))
     palette.setColor(QPalette.ColorRole.WindowText, QColor(229, 231, 235))
-    palette.setColor(QPalette.ColorRole.Base, QColor(17, 19, 23))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(31, 34, 40))
-    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(17, 19, 23))
+    palette.setColor(QPalette.ColorRole.Base, QColor(20, 24, 30))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(26, 31, 38))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(20, 24, 30))
     palette.setColor(QPalette.ColorRole.ToolTipText, QColor(229, 231, 235))
     palette.setColor(QPalette.ColorRole.Text, QColor(229, 231, 235))
-    palette.setColor(QPalette.ColorRole.Button, QColor(31, 34, 40))
+    palette.setColor(QPalette.ColorRole.Button, QColor(34, 39, 46))
     palette.setColor(QPalette.ColorRole.ButtonText, QColor(229, 231, 235))
     palette.setColor(QPalette.ColorRole.BrightText, QColor(248, 113, 113))
-    palette.setColor(QPalette.ColorRole.Link, QColor(96, 165, 250))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(79, 70, 229))
+    palette.setColor(QPalette.ColorRole.Link, QColor(34, 197, 181))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(34, 197, 181))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
     
-    # Set modern stylesheet - Professional design system
+    # Set simplified stylesheet for a cleaner UI
     app.setStyleSheet("""
-        /* Modern design system with refined aesthetics */
         QMainWindow {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #181A1F, stop:1 #0F1117);
+            background-color: #0F1115;
         }
         
         QTabWidget::pane {
-            border: 1px solid #2D3139;
-            background-color: #181A1F;
-            border-radius: 8px;
+            border: 1px solid #262B32;
+            background-color: #0F1115;
+            border-radius: 6px;
         }
         
         QTabBar::tab {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #1F2228, stop:1 #181A1F);
-            color: #9CA3AF;
-            padding: 10px 24px;
-            border: 1px solid #2D3139;
+            background: #171B22;
+            color: #B5BDC9;
+            padding: 7px 16px;
+            border: 1px solid #262B32;
             border-bottom: none;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
             font-weight: 600;
-            font-size: 13px;
+            font-size: 12px;
             margin-right: 2px;
         }
         
         QTabBar::tab:selected {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #4F46E5, stop:1 #4338CA);
+            background: #1D232B;
             color: #FFFFFF;
-            border-bottom: 2px solid #6366F1;
         }
         
         QTabBar::tab:hover:!selected {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #252830, stop:1 #1F2228);
-            color: #E5E7EB;
+            background: #1B2027;
+            color: #DCE1E8;
         }
         
         QPushButton {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #6366F1, stop:1 #4F46E5);
-            color: white;
+            background: #1FAE9B;
+            color: #FFFFFF;
             border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            min-width: 90px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            min-width: 84px;
             font-weight: 600;
-            font-size: 13px;
+            font-size: 12px;
         }
         
         QPushButton:hover {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #818CF8, stop:1 #6366F1);
+            background: #23C3AE;
         }
         
         QPushButton:pressed {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #4338CA, stop:1 #3730A3);
-            padding: 11px 20px 9px 20px;
+            background: #189686;
         }
         
         QLineEdit {
-            padding: 11px 14px;
-            border: 2px solid #2D3139;
-            border-radius: 8px;
-            background-color: #1F2228;
+            padding: 8px 10px;
+            border: 1px solid #2A2F36;
+            border-radius: 6px;
+            background-color: #171B22;
             color: #E5E7EB;
-            font-size: 13px;
-            selection-background-color: #4F46E5;
+            font-size: 12px;
+            selection-background-color: #23C3AE;
         }
         
         QLineEdit:focus {
-            border: 2px solid #6366F1;
-            background-color: #252830;
+            border: 1px solid #23C3AE;
+            background-color: #1B2027;
         }
         
         QLabel {
@@ -122,43 +111,40 @@ def main():
         }
         
         QTableWidget {
-            background-color: #181A1F;
-            alternate-background-color: #1F2228;
+            background-color: #12161C;
+            alternate-background-color: #171B22;
             color: #E5E7EB;
-            gridline-color: #2D3139;
-            border: 2px solid #2D3139;
-            border-radius: 8px;
+            gridline-color: #2A2F36;
+            border: 1px solid #2A2F36;
+            border-radius: 6px;
         }
         
         QTableWidget::item {
-            padding: 10px;
-            border-bottom: 1px solid #2D3139;
+            padding: 8px;
+            border-bottom: 1px solid #2A2F36;
         }
         
         QTableWidget::item:selected {
-            background-color: #4F46E5;
+            background-color: #1FAE9B;
             color: #FFFFFF;
         }
         
         QHeaderView::section {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #252830, stop:1 #1F2228);
-            color: #F3F4F6;
-            padding: 10px;
-            border: 1px solid #2D3139;
+            background: #171B22;
+            color: #CCD3DD;
+            padding: 7px;
+            border: 1px solid #2A2F36;
             font-weight: 600;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 11px;
         }
         
         QToolTip {
-            background-color: #111317;
+            background-color: #171B22;
             color: #E5E7EB;
-            border: 2px solid #4F46E5;
-            border-radius: 8px;
-            padding: 10px 12px;
-            font-size: 12px;
+            border: 1px solid #2A2F36;
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 11px;
         }
         
         QMessageBox {
@@ -172,18 +158,38 @@ def main():
         }
         
         QSplitter::handle {
-            background-color: #2D3139;
+            background-color: #262B32;
         }
         
         QSplitter::handle:hover {
-            background-color: #4F46E5;
+            background-color: #23C3AE;
+        }
+
+        QScrollBar:vertical {
+            background: #101318;
+            width: 10px;
+            margin: 2px;
+        }
+
+        QScrollBar::handle:vertical {
+            background: #2A313A;
+            border-radius: 5px;
+            min-height: 24px;
+        }
+
+        QScrollBar::handle:vertical:hover {
+            background: #37404A;
+        }
+
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            height: 0px;
         }
     """)
     
     main_window = QMainWindow()
     widget = PriorityPlotWidget()
     main_window.setCentralWidget(widget)
-    main_window.setWindowTitle('priplot')
+    main_window.setWindowTitle('Priority Plot  •  Task Prioritization Made Simple')
     
     # Make window scalable and responsive to different screen sizes
     # Get screen geometry to set appropriate default size
