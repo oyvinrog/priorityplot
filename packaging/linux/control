@@ -1,0 +1,7 @@
+Package: priorityplot
+Version: __VERSION__
+Section: utils
+Priority: optional
+Architecture: __ARCH__
+Maintainer: PriorityPlot <support@example.com>
+Description: Interactive task priority visualization

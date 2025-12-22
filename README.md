@@ -129,7 +129,11 @@ The executable will be created in `dist/` (for example `dist/priorityplot` or `d
 ### GitHub Actions Releases
 
 Releases automatically build executables for macOS, Windows, and Linux via `.github/workflows/build-executables.yml`.
-Artifacts are attached to the GitHub Release and also available in the workflow run.
+Artifacts are attached to the GitHub Release and also available in the workflow run, including installers:
+
+- Windows: NSIS installer (`PriorityPlot_<version>.exe`)
+- macOS: DMG (`priorityplot_<version>_macos.dmg`)
+- Linux: DEB (`priorityplot_<version>_<arch>.deb`)
 
 ### Getting Started
 
