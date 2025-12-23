@@ -1,26 +1,37 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QSplitter, QMessageBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QSplitter, QMessageBox, QLineEdit
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QShortcut, QKeySequence
 from typing import List
 
 from .interfaces import ITaskCoordinator, IWidgetEventHandler
 from .model import Task, TaskValidator, SampleDataGenerator
 from .input_widgets import TaskInputCoordinator
 from .plot_widgets import PlotResultsCoordinator
+from .goal_memory import GoalMemory
 
 class TaskCoordinatorImpl(ITaskCoordinator):
     """Implementation of task coordination following DIP - depends on abstractions"""
     
-    def __init__(self, task_list: List[Task]):
+    def __init__(self, task_list: List[Task], goal_memory: GoalMemory = None):
         self._task_list = task_list
+        self._goal_memory = goal_memory
     
     def add_task(self, task_name: str) -> bool:
         """Add a new task"""
         try:
-            new_task = TaskValidator.create_validated_task(task_name)
+            new_task = self.create_task_with_memory(task_name)
             self._task_list.append(new_task)
             return True
         except ValueError:
             return False
+
+    def create_task_with_memory(self, task_name: str) -> Task:
+        if self._goal_memory is None:
+            return TaskValidator.create_validated_task(task_name)
+        match = self._goal_memory.find_match(task_name)
+        if match:
+            return TaskValidator.create_validated_task(task_name, match.value, match.time)
+        return TaskValidator.create_validated_task(task_name)
     
     
     def get_tasks(self) -> List[Task]:
@@ -50,7 +61,8 @@ class PriorityPlotWidget(QWidget):
         
         # Initialize task coordination (DIP - depend on abstraction)
         self._task_list = task_list if task_list is not None else []
-        self._task_coordinator = TaskCoordinatorImpl(self._task_list)
+        self._goal_memory = GoalMemory()
+        self._task_coordinator = TaskCoordinatorImpl(self._task_list, self._goal_memory)
         
         # Initialize UI components
         self._setup_ui()
@@ -65,7 +77,7 @@ class PriorityPlotWidget(QWidget):
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Input panel (left side) - following SRP
-        self.input_coordinator = TaskInputCoordinator()
+        self.input_coordinator = TaskInputCoordinator(goal_memory=self._goal_memory)
         self.input_coordinator.set_tasks(self._task_list)
         
         # Results panel (right side) - following SRP  
@@ -81,6 +93,23 @@ class PriorityPlotWidget(QWidget):
         
         layout.addWidget(self.main_splitter)
         self.setLayout(layout)
+        
+        # Add Ctrl+V shortcut for pasting tasks from clipboard
+        self._setup_paste_shortcut()
+    
+    def _setup_paste_shortcut(self):
+        """Setup Ctrl+V shortcut to paste tasks when not in a text field"""
+        self.paste_shortcut = QShortcut(QKeySequence.StandardKey.Paste, self)
+        self.paste_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        self.paste_shortcut.activated.connect(self._handle_paste_shortcut)
+    
+    def _handle_paste_shortcut(self):
+        """Handle Ctrl+V - import tasks if not focused on a text input"""
+        from PyQt6.QtWidgets import QApplication
+        focused_widget = QApplication.focusWidget()
+        # Only import tasks if not typing in a text field
+        if not isinstance(focused_widget, QLineEdit):
+            self.input_coordinator._import_from_clipboard()
     
     def _setup_results_panel(self):
         """Setup the results panel with plot"""
@@ -104,6 +133,8 @@ class PriorityPlotWidget(QWidget):
         self.plot_coordinator.task_updated.connect(self._on_task_updated)
         self.plot_coordinator.task_added.connect(self._on_task_added_from_results)
         self.plot_coordinator.task_deleted.connect(self._on_task_deleted_from_results)
+        self.plot_coordinator.task_renamed.connect(self._on_task_renamed_from_results)
+        self.plot_coordinator.task_move_finished.connect(self._on_task_move_finished)
     
     def _on_tasks_updated(self, tasks: List[Task]):
         """Handle task list updates from input coordinator"""
@@ -124,11 +155,17 @@ class PriorityPlotWidget(QWidget):
     def _on_task_added_from_results(self, task_name: str):
         """Handle task addition from results view"""
         try:
-            new_task = TaskValidator.create_validated_task(task_name)
+            new_task = self._task_coordinator.create_task_with_memory(task_name)
             self._task_list.append(new_task)
             self._update_all_displays()
         except ValueError as e:
             QMessageBox.warning(self, "Invalid Task", f"Could not add task:\n{str(e)}")
+
+    def _on_task_renamed_from_results(self, task_index: int, task_name: str):
+        """Handle task rename from results view"""
+        if 0 <= task_index < len(self._task_list):
+            self._task_list[task_index].task = task_name
+            self._update_all_displays()
     
     def _show_results(self):
         """Transition to results view"""
@@ -147,7 +184,15 @@ class PriorityPlotWidget(QWidget):
     
     def _update_all_displays(self):
         """Update all display components"""
+        save_memory = True
+        if hasattr(self, "plot_coordinator") and hasattr(self.plot_coordinator, "plot_widget"):
+            save_memory = not self.plot_coordinator.plot_widget.dragging
+        self._goal_memory.update_from_tasks(self._task_list, save=save_memory)
         self.plot_coordinator.set_tasks(self._task_list)
+
+    def _on_task_move_finished(self, task_index: int, value: float, time: float):
+        """Persist goal memory after a drag finishes."""
+        self._goal_memory.update_from_tasks(self._task_list, save=True)
     
     # Implementation of IWidgetEventHandler interface
     def on_task_selected(self, task_index: int) -> None:

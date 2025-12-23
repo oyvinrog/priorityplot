@@ -12,7 +12,7 @@ import os
 
 from .interfaces import IPlotWidget, ITaskDisplayWidget, IExportService
 from .model import (Task, TaskConstants, TaskStateManager, TaskDisplayFormatter, 
-                   ExcelExporter, get_top_tasks, get_task_colors)
+                   ExcelExporter, get_top_tasks, get_task_colors, TaskValidator)
 from .ui_constants import (ColorPalette, SizeConstants, OpacityConstants, 
                            InteractionConstants, LayoutConstants, FigureConstants)
 
@@ -24,6 +24,7 @@ class InteractivePlotWidget(QWidget):
     task_selected = pyqtSignal(int)  # task_index
     task_drag_started = pyqtSignal(int, str)  # task index, task data for external drops
     task_delete_requested = pyqtSignal(int)  # task index to delete
+    task_move_finished = pyqtSignal(int, float, float)  # task_index, value, time
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -102,6 +103,12 @@ class InteractivePlotWidget(QWidget):
             fontweight='bold',
             pad=LayoutConstants.LABEL_PAD_LARGE,
             fontstyle='normal'
+        )
+        self.figure.subplots_adjust(
+            left=LayoutConstants.FIG_LEFT,
+            bottom=LayoutConstants.FIG_BOTTOM,
+            right=LayoutConstants.FIG_RIGHT,
+            top=LayoutConstants.FIG_TOP
         )
         
         # Style ticks with modern colors
@@ -589,6 +596,7 @@ class InteractivePlotWidget(QWidget):
         """Clean up after drag operation"""
         # Restore cursor
         QApplication.restoreOverrideCursor()
+        finished_task = None
         
         if self.dragging and self.drag_index is not None:
             # Emit final update for internal drags
@@ -597,6 +605,7 @@ class InteractivePlotWidget(QWidget):
                 self.task_moved.emit(self.drag_index, task.value, task.time)
                 # Full redraw
                 self.update_plot(self._tasks)
+                finished_task = (self.drag_index, task.value, task.time)
         
         # Clean up visual elements
         if self.drag_preview_annotation:
@@ -625,6 +634,9 @@ class InteractivePlotWidget(QWidget):
         
         if hasattr(self, 'canvas'):
             self.canvas.draw_idle()
+
+        if finished_task is not None:
+            self.task_move_finished.emit(*finished_task)
     
     def keyPressEvent(self, event):
         """Handle keyboard events for task deletion"""
@@ -696,6 +708,7 @@ class DraggableTaskTable(QTableWidget):
     task_selected = pyqtSignal(int)  # original task index
     task_drag_started = pyqtSignal(int, str)  # task index, task data
     task_delete_requested = pyqtSignal(int)  # task index to delete
+    task_renamed = pyqtSignal(int, str)  # task index, new name
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -703,6 +716,7 @@ class DraggableTaskTable(QTableWidget):
         self._sorted_tasks = []
         self._parent_widget = parent
         self._max_score = 1.0  # Track max score for progress bar scaling
+        self._ignore_item_changes = False
         self._setup_table()
         
     def _setup_table(self):
@@ -773,9 +787,11 @@ class DraggableTaskTable(QTableWidget):
         
         # Connect signals
         self.cellClicked.connect(self._on_cell_clicked)
+        self.itemChanged.connect(self._on_item_changed)
     
     def refresh_display(self, tasks: List[Task]) -> None:
         """Implementation of ITaskDisplayWidget interface"""
+        self._ignore_item_changes = True
         self._tasks = tasks
         
         # Calculate scores and sort
@@ -795,6 +811,7 @@ class DraggableTaskTable(QTableWidget):
         
         # Apply top 3 highlighting
         self._apply_top_highlighting()
+        self._ignore_item_changes = False
     
     def highlight_task(self, task_index: int) -> None:
         """Implementation of ITaskDisplayWidget interface"""
@@ -818,6 +835,7 @@ class DraggableTaskTable(QTableWidget):
         rank_text = TaskDisplayFormatter.format_rank(row + 1)
         rank_item = QTableWidgetItem(rank_text)
         rank_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        rank_item.setFlags(rank_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         if row < 3:
             font = rank_item.font()
             font.setBold(True)
@@ -829,6 +847,7 @@ class DraggableTaskTable(QTableWidget):
         task_name = TaskDisplayFormatter.format_task_name(task)
         task_item = QTableWidgetItem(task_name)
         task_item.setToolTip(TaskDisplayFormatter.get_tooltip_text(task))
+        task_item.setFlags(task_item.flags() | Qt.ItemFlag.ItemIsEditable)
         if row < 3:
             font = task_item.font()
             font.setBold(True)
@@ -839,6 +858,7 @@ class DraggableTaskTable(QTableWidget):
         value_item = QTableWidgetItem(TaskDisplayFormatter.format_value(task.value))
         value_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         value_item.setToolTip(f"Impact/Value rating: {task.value:.1f} out of {TaskConstants.MAX_VALUE:.1f}")
+        value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         if row < 3:
             font = value_item.font()
             font.setBold(True)
@@ -849,6 +869,7 @@ class DraggableTaskTable(QTableWidget):
         score_item = QTableWidgetItem(TaskDisplayFormatter.format_priority_score(task.score))
         score_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         score_item.setToolTip(f"Priority Score: {task.score:.2f}\nCalculated as Value({task.value:.1f}) ÷ Time({task.time:.1f})")
+        score_item.setFlags(score_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         if row < 3:
             font = score_item.font()
             font.setBold(True)
@@ -862,25 +883,7 @@ class DraggableTaskTable(QTableWidget):
         # Delete button
         delete_btn = QPushButton("✕")
         delete_btn.setToolTip("Remove this task")
-        delete_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #EF4444;
-                border: 1px solid #3D4451;
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #EF4444;
-                color: white;
-                border: 1px solid #EF4444;
-            }
-            QPushButton:pressed {
-                background: #DC2626;
-            }
-        """)
+        delete_btn.setProperty("variant", "danger")
         # Find original task index
         original_index = self._tasks.index(task) if task in self._tasks else -1
         delete_btn.clicked.connect(lambda checked, idx=original_index: self._on_delete_clicked(idx))
@@ -1008,6 +1011,29 @@ class DraggableTaskTable(QTableWidget):
             selected_task = self._sorted_tasks[row]
             original_index = self._tasks.index(selected_task)
             self.task_selected.emit(original_index)
+
+    def _on_item_changed(self, item: QTableWidgetItem):
+        if self._ignore_item_changes:
+            return
+        if item.column() != 1:
+            return
+        row = item.row()
+        if row >= len(self._sorted_tasks):
+            return
+        selected_task = self._sorted_tasks[row]
+        if selected_task not in self._tasks:
+            return
+        original_index = self._tasks.index(selected_task)
+        clean_name = TaskValidator.sanitize_task_name(item.text())
+        if not TaskValidator.validate_task_name(clean_name):
+            self._ignore_item_changes = True
+            item.setText(selected_task.task)
+            self._ignore_item_changes = False
+            QMessageBox.warning(self, "Invalid Task", "Task name cannot be empty.")
+            return
+        if selected_task.task == clean_name:
+            return
+        self.task_renamed.emit(original_index, clean_name)
     
     def startDrag(self, supportedActions):
         """Override to provide custom drag data"""
@@ -1090,37 +1116,12 @@ class ExportButtonWidget(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 10, 0, 0)
         
-        # Quick export button (primary) with enhanced styling
+        # Quick export button (primary)
         self.quick_export_button = QPushButton('📊  Export to Excel')
-        self.quick_export_button.setMinimumHeight(42)
         self.quick_export_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.quick_export_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #10B981, stop:0.5 #059669, stop:1 #047857);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 14px;
-                font-weight: bold;
-                letter-spacing: 0.5px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #34D399, stop:0.5 #10B981, stop:1 #059669);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #059669, stop:0.5 #047857, stop:1 #065F46);
-            }
-            QPushButton:disabled {
-                background: #374151;
-                color: #6B7280;
-            }
-        """)
+        self.quick_export_button.setProperty("variant", "primary")
         self.quick_export_button.clicked.connect(self._quick_export)
-        layout.addWidget(self.quick_export_button)
+        layout.addWidget(self.quick_export_button, alignment=Qt.AlignmentFlag.AlignLeft)
         
         self.setLayout(layout)
     
@@ -1181,6 +1182,8 @@ class PlotResultsCoordinator(QWidget):
     task_drag_started = pyqtSignal(int, str)  # task_index, task_data (forwarded from graph and table)
     task_added = pyqtSignal(str)  # task_name (when new task is added)
     task_deleted = pyqtSignal(int)  # task_index (when task is deleted)
+    task_renamed = pyqtSignal(int, str)  # task_index, new name
+    task_move_finished = pyqtSignal(int, float, float)  # task_index, value, time
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1223,29 +1226,8 @@ class PlotResultsCoordinator(QWidget):
         quick_add_layout.addWidget(self.quick_task_input)
 
         self.quick_add_button = QPushButton("Add")
-        self.quick_add_button.setMinimumHeight(38)
-        self.quick_add_button.setMinimumWidth(80)
         self.quick_add_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.quick_add_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #10B981, stop:1 #059669);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 8px 16px;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #34D399, stop:1 #10B981);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #059669, stop:1 #047857);
-            }
-        """)
+        self.quick_add_button.setProperty("variant", "primary")
         self.quick_add_button.clicked.connect(self._add_quick_task)
         quick_add_layout.addWidget(self.quick_add_button)
         layout.addLayout(quick_add_layout)
@@ -1289,9 +1271,11 @@ class PlotResultsCoordinator(QWidget):
         self.plot_widget.task_selected.connect(self._on_task_selected)
         self.plot_widget.task_drag_started.connect(self._on_task_drag_started)  # Connect graph drag signal
         self.plot_widget.task_delete_requested.connect(self._on_task_delete_requested)  # Connect plot delete signal
+        self.plot_widget.task_move_finished.connect(self._on_task_move_finished)
         self.results_table.task_selected.connect(self._on_task_selected)
         self.results_table.task_drag_started.connect(self._on_task_drag_started)  # Connect table drag signal
         self.results_table.task_delete_requested.connect(self._on_task_delete_requested)
+        self.results_table.task_renamed.connect(self._on_task_renamed)
     
     def _on_task_moved(self, task_index: int, value: float, time: float):
         """Handle task movement in plot"""
@@ -1319,6 +1303,15 @@ class PlotResultsCoordinator(QWidget):
         """Handle task deletion request from results table or plot"""
         if 0 <= task_index < len(self._tasks):
             self.task_deleted.emit(task_index)
+
+    def _on_task_renamed(self, task_index: int, task_name: str):
+        """Handle task rename request from results table"""
+        if 0 <= task_index < len(self._tasks):
+            self.task_renamed.emit(task_index, task_name)
+
+    def _on_task_move_finished(self, task_index: int, value: float, time: float):
+        """Forward move completion so persistence can happen once per drag."""
+        self.task_move_finished.emit(task_index, value, time)
     
     def set_tasks(self, tasks: List[Task]):
         """Set tasks for display"""

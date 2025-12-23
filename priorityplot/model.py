@@ -234,7 +234,7 @@ class SampleDataGenerator:
         return [Task(name, value, time) for name, value, time in sample_data]
     
     @staticmethod
-    def create_tasks_from_text(text: str) -> List[Task]:
+    def create_tasks_from_text(text: str, goal_memory=None) -> List[Task]:
         """Create tasks from clipboard or text input"""
         if not text or not text.strip():
             return []
@@ -244,7 +244,14 @@ class SampleDataGenerator:
         
         for line in lines:
             try:
-                task = TaskValidator.create_validated_task(line)
+                if goal_memory is not None:
+                    match = goal_memory.find_match(line)
+                    if match:
+                        task = TaskValidator.create_validated_task(line, match.value, match.time)
+                    else:
+                        task = TaskValidator.create_validated_task(line)
+                else:
+                    task = TaskValidator.create_validated_task(line)
                 tasks.append(task)
             except ValueError:
                 # Skip invalid lines

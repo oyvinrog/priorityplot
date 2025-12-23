@@ -2,9 +2,10 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QLineEdit,
                              QLabel, QTableWidget, QTableWidgetItem, QMessageBox,
                              QHeaderView, QApplication)
 from PyQt6.QtCore import Qt, pyqtSignal
-from typing import List
+from typing import List, Optional
 from .interfaces import ITaskInputWidget, ITaskDisplayWidget
 from .model import Task, SampleDataGenerator, TaskValidator
+from .goal_memory import GoalMemory
 
 class TaskInputField(QWidget):
     """Single responsibility: Handle individual task input following SRP
@@ -20,11 +21,12 @@ class TaskInputField(QWidget):
         layout = QVBoxLayout()
         
         self.task_input = QLineEdit()
-        self.task_input.setPlaceholderText("Add a task")
+        self.task_input.setPlaceholderText("Add a task (Ctrl+V to paste in bulk)")
         self.task_input.returnPressed.connect(self._on_return_pressed)
         layout.addWidget(self.task_input)
         
         self.add_button = QPushButton("Add")
+        self.add_button.setProperty("variant", "primary")
         self.add_button.clicked.connect(self._on_add_clicked)
         layout.addWidget(self.add_button)
         
@@ -59,9 +61,11 @@ class TaskInputTable(QTableWidget):
     Implements ITaskDisplayWidget protocol"""
     
     task_delete_requested = pyqtSignal(int)  # Emit when task deletion is requested
+    task_renamed = pyqtSignal(int, str)  # Emit when task name is edited
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._ignore_item_changes = False
         self._setup_table()
     
     def _setup_table(self):
@@ -71,9 +75,11 @@ class TaskInputTable(QTableWidget):
         self.setColumnWidth(1, 90)
         self.horizontalHeader().setStretchLastSection(False)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.itemChanged.connect(self._on_item_changed)
     
     def refresh_display(self, tasks: List[Task]) -> None:
         """Implementation of ITaskDisplayWidget protocol"""
+        self._ignore_item_changes = True
         self.setRowCount(len(tasks))
         for i, task in enumerate(tasks):
             # Task name
@@ -81,22 +87,10 @@ class TaskInputTable(QTableWidget):
             
             # Delete button
             delete_btn = QPushButton("Remove")
-            delete_btn.setStyleSheet("""
-                QPushButton {
-                    background: transparent;
-                    color: #F87171;
-                    border: 1px solid #2A2F36;
-                    border-radius: 6px;
-                    padding: 4px 8px;
-                    font-size: 12px;
-                    font-weight: 600;
-                }
-                QPushButton:hover {
-                    background: #20252C;
-                }
-            """)
+            delete_btn.setProperty("variant", "danger")
             delete_btn.clicked.connect(lambda checked, idx=i: self.task_delete_requested.emit(idx))
             self.setCellWidget(i, 1, delete_btn)
+        self._ignore_item_changes = False
     
     def highlight_task(self, task_index: int) -> None:
         """Implementation of ITaskDisplayWidget protocol"""
@@ -119,15 +113,23 @@ class TaskInputTable(QTableWidget):
         else:
             super().keyPressEvent(event)
 
+    def _on_item_changed(self, item: QTableWidgetItem):
+        if self._ignore_item_changes:
+            return
+        if item.column() != 0:
+            return
+        self.task_renamed.emit(item.row(), item.text())
+
 class TaskInputCoordinator(QWidget):
     """Single responsibility: Coordinate task input operations following SRP"""
     
     tasks_updated = pyqtSignal(list)  # Emit when task list changes
     show_results_requested = pyqtSignal()
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, goal_memory: Optional[GoalMemory] = None):
         super().__init__(parent)
         self._tasks = []
+        self._goal_memory = goal_memory
         self._setup_ui()
         self._connect_signals()
     
@@ -146,6 +148,7 @@ class TaskInputCoordinator(QWidget):
 
         # Import from clipboard
         self.import_button = QPushButton("Import from Clipboard")
+        self.import_button.setProperty("variant", "secondary")
         self.import_button.clicked.connect(self._import_from_clipboard)
         layout.addWidget(self.import_button)
         
@@ -159,6 +162,7 @@ class TaskInputCoordinator(QWidget):
         
         # Show results button
         self.show_results_button = QPushButton("Open Plot")
+        self.show_results_button.setProperty("variant", "primary")
         self.show_results_button.clicked.connect(self.show_results_requested.emit)
         layout.addWidget(self.show_results_button)
         self.show_results_button.hide()
@@ -169,16 +173,25 @@ class TaskInputCoordinator(QWidget):
     def _connect_signals(self):
         self.task_input_field.task_added.connect(self._add_task)
         self.task_table.task_delete_requested.connect(self._delete_task)
+        self.task_table.task_renamed.connect(self._rename_task)
     
     def _add_task(self, task_name: str):
         """Add a single task"""
         try:
-            new_task = TaskValidator.create_validated_task(task_name)
+            new_task = self._create_task_with_memory(task_name)
             self._tasks.append(new_task)
             self._update_display()
             self._update_ui_state()
         except ValueError as e:
             QMessageBox.warning(self, "Invalid Task", f"Could not create task:\n{str(e)}")
+
+    def _create_task_with_memory(self, task_name: str) -> Task:
+        if self._goal_memory is None:
+            return TaskValidator.create_validated_task(task_name)
+        match = self._goal_memory.find_match(task_name)
+        if match:
+            return TaskValidator.create_validated_task(task_name, match.value, match.time)
+        return TaskValidator.create_validated_task(task_name)
     
     def _delete_task(self, task_index: int):
         """Delete a task by index"""
@@ -186,6 +199,20 @@ class TaskInputCoordinator(QWidget):
             del self._tasks[task_index]
             self._update_display()
             self._update_ui_state()
+
+    def _rename_task(self, task_index: int, task_name: str):
+        """Rename a task by index"""
+        if not (0 <= task_index < len(self._tasks)):
+            return
+        clean_name = TaskValidator.sanitize_task_name(task_name)
+        if not TaskValidator.validate_task_name(clean_name):
+            QMessageBox.warning(self, "Invalid Task", "Task name cannot be empty.")
+            self._update_display()
+            return
+        if self._tasks[task_index].task == clean_name:
+            return
+        self._tasks[task_index].task = clean_name
+        self._update_display()
     
     def _import_from_clipboard(self):
         """Import tasks from clipboard"""
@@ -196,7 +223,7 @@ class TaskInputCoordinator(QWidget):
             QMessageBox.warning(self, "Clipboard Empty", "No text found in clipboard.")
             return
         
-        new_tasks = SampleDataGenerator.create_tasks_from_text(text)
+        new_tasks = SampleDataGenerator.create_tasks_from_text(text, goal_memory=self._goal_memory)
         
         if not new_tasks:
             QMessageBox.warning(self, "No Valid Tasks", "The clipboard text doesn't contain valid tasks.")
@@ -218,13 +245,15 @@ class TaskInputCoordinator(QWidget):
         if len(self._tasks) >= 1:
             self.show_results_button.show()
             
-        # Update placeholder text
-        if len(self._tasks) == 1:
-            self.task_input_field.set_placeholder_text("Add another task or view the plot.")
+        # Update placeholder text (always include Ctrl+V hint)
+        if len(self._tasks) == 0:
+            self.task_input_field.set_placeholder_text("Add a task (Ctrl+V to paste in bulk)")
+        elif len(self._tasks) == 1:
+            self.task_input_field.set_placeholder_text("Add another task or view the plot (Ctrl+V to paste)")
         elif len(self._tasks) >= 3:
-            self.task_input_field.set_placeholder_text("View the plot when ready.")
+            self.task_input_field.set_placeholder_text("View the plot when ready (Ctrl+V to paste more)")
         else:
-            self.task_input_field.set_placeholder_text("Add another task.")
+            self.task_input_field.set_placeholder_text("Add another task (Ctrl+V to paste in bulk)")
     
     def get_tasks(self) -> List[Task]:
         """Get current task list"""

@@ -242,7 +242,7 @@ class LayoutConstants:
     FIG_LEFT = 0.12
     FIG_BOTTOM = 0.12
     FIG_RIGHT = 0.95
-    FIG_TOP = 0.92
+    FIG_TOP = 0.88
     
     # Splitter sizes
     SPLITTER_PLOT_SIZE = 300
@@ -301,4 +301,3 @@ class FigureConstants:
     FIG_WIDTH = 8
     FIG_HEIGHT = 5
     FIG_DPI = 100
-
