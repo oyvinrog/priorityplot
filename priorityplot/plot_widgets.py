@@ -12,7 +12,7 @@ import os
 
 from .interfaces import IPlotWidget, ITaskDisplayWidget, IExportService
 from .model import (Task, TaskConstants, TaskStateManager, TaskDisplayFormatter, 
-                   ExcelExporter, get_top_tasks, get_task_colors)
+                   ExcelExporter, get_top_tasks, get_task_colors, TaskValidator)
 from .ui_constants import (ColorPalette, SizeConstants, OpacityConstants, 
                            InteractionConstants, LayoutConstants, FigureConstants)
 
@@ -702,6 +702,7 @@ class DraggableTaskTable(QTableWidget):
     task_selected = pyqtSignal(int)  # original task index
     task_drag_started = pyqtSignal(int, str)  # task index, task data
     task_delete_requested = pyqtSignal(int)  # task index to delete
+    task_renamed = pyqtSignal(int, str)  # task index, new name
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -709,6 +710,7 @@ class DraggableTaskTable(QTableWidget):
         self._sorted_tasks = []
         self._parent_widget = parent
         self._max_score = 1.0  # Track max score for progress bar scaling
+        self._ignore_item_changes = False
         self._setup_table()
         
     def _setup_table(self):
@@ -779,9 +781,11 @@ class DraggableTaskTable(QTableWidget):
         
         # Connect signals
         self.cellClicked.connect(self._on_cell_clicked)
+        self.itemChanged.connect(self._on_item_changed)
     
     def refresh_display(self, tasks: List[Task]) -> None:
         """Implementation of ITaskDisplayWidget interface"""
+        self._ignore_item_changes = True
         self._tasks = tasks
         
         # Calculate scores and sort
@@ -801,6 +805,7 @@ class DraggableTaskTable(QTableWidget):
         
         # Apply top 3 highlighting
         self._apply_top_highlighting()
+        self._ignore_item_changes = False
     
     def highlight_task(self, task_index: int) -> None:
         """Implementation of ITaskDisplayWidget interface"""
@@ -824,6 +829,7 @@ class DraggableTaskTable(QTableWidget):
         rank_text = TaskDisplayFormatter.format_rank(row + 1)
         rank_item = QTableWidgetItem(rank_text)
         rank_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        rank_item.setFlags(rank_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         if row < 3:
             font = rank_item.font()
             font.setBold(True)
@@ -835,6 +841,7 @@ class DraggableTaskTable(QTableWidget):
         task_name = TaskDisplayFormatter.format_task_name(task)
         task_item = QTableWidgetItem(task_name)
         task_item.setToolTip(TaskDisplayFormatter.get_tooltip_text(task))
+        task_item.setFlags(task_item.flags() | Qt.ItemFlag.ItemIsEditable)
         if row < 3:
             font = task_item.font()
             font.setBold(True)
@@ -845,6 +852,7 @@ class DraggableTaskTable(QTableWidget):
         value_item = QTableWidgetItem(TaskDisplayFormatter.format_value(task.value))
         value_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         value_item.setToolTip(f"Impact/Value rating: {task.value:.1f} out of {TaskConstants.MAX_VALUE:.1f}")
+        value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         if row < 3:
             font = value_item.font()
             font.setBold(True)
@@ -855,6 +863,7 @@ class DraggableTaskTable(QTableWidget):
         score_item = QTableWidgetItem(TaskDisplayFormatter.format_priority_score(task.score))
         score_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         score_item.setToolTip(f"Priority Score: {task.score:.2f}\nCalculated as Value({task.value:.1f}) ÷ Time({task.time:.1f})")
+        score_item.setFlags(score_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         if row < 3:
             font = score_item.font()
             font.setBold(True)
@@ -996,6 +1005,29 @@ class DraggableTaskTable(QTableWidget):
             selected_task = self._sorted_tasks[row]
             original_index = self._tasks.index(selected_task)
             self.task_selected.emit(original_index)
+
+    def _on_item_changed(self, item: QTableWidgetItem):
+        if self._ignore_item_changes:
+            return
+        if item.column() != 1:
+            return
+        row = item.row()
+        if row >= len(self._sorted_tasks):
+            return
+        selected_task = self._sorted_tasks[row]
+        if selected_task not in self._tasks:
+            return
+        original_index = self._tasks.index(selected_task)
+        clean_name = TaskValidator.sanitize_task_name(item.text())
+        if not TaskValidator.validate_task_name(clean_name):
+            self._ignore_item_changes = True
+            item.setText(selected_task.task)
+            self._ignore_item_changes = False
+            QMessageBox.warning(self, "Invalid Task", "Task name cannot be empty.")
+            return
+        if selected_task.task == clean_name:
+            return
+        self.task_renamed.emit(original_index, clean_name)
     
     def startDrag(self, supportedActions):
         """Override to provide custom drag data"""
@@ -1144,6 +1176,7 @@ class PlotResultsCoordinator(QWidget):
     task_drag_started = pyqtSignal(int, str)  # task_index, task_data (forwarded from graph and table)
     task_added = pyqtSignal(str)  # task_name (when new task is added)
     task_deleted = pyqtSignal(int)  # task_index (when task is deleted)
+    task_renamed = pyqtSignal(int, str)  # task_index, new name
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1234,6 +1267,7 @@ class PlotResultsCoordinator(QWidget):
         self.results_table.task_selected.connect(self._on_task_selected)
         self.results_table.task_drag_started.connect(self._on_task_drag_started)  # Connect table drag signal
         self.results_table.task_delete_requested.connect(self._on_task_delete_requested)
+        self.results_table.task_renamed.connect(self._on_task_renamed)
     
     def _on_task_moved(self, task_index: int, value: float, time: float):
         """Handle task movement in plot"""
@@ -1261,6 +1295,11 @@ class PlotResultsCoordinator(QWidget):
         """Handle task deletion request from results table or plot"""
         if 0 <= task_index < len(self._tasks):
             self.task_deleted.emit(task_index)
+
+    def _on_task_renamed(self, task_index: int, task_name: str):
+        """Handle task rename request from results table"""
+        if 0 <= task_index < len(self._tasks):
+            self.task_renamed.emit(task_index, task_name)
     
     def set_tasks(self, tasks: List[Task]):
         """Set tasks for display"""

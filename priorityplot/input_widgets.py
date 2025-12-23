@@ -60,9 +60,11 @@ class TaskInputTable(QTableWidget):
     Implements ITaskDisplayWidget protocol"""
     
     task_delete_requested = pyqtSignal(int)  # Emit when task deletion is requested
+    task_renamed = pyqtSignal(int, str)  # Emit when task name is edited
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._ignore_item_changes = False
         self._setup_table()
     
     def _setup_table(self):
@@ -72,9 +74,11 @@ class TaskInputTable(QTableWidget):
         self.setColumnWidth(1, 90)
         self.horizontalHeader().setStretchLastSection(False)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.itemChanged.connect(self._on_item_changed)
     
     def refresh_display(self, tasks: List[Task]) -> None:
         """Implementation of ITaskDisplayWidget protocol"""
+        self._ignore_item_changes = True
         self.setRowCount(len(tasks))
         for i, task in enumerate(tasks):
             # Task name
@@ -85,6 +89,7 @@ class TaskInputTable(QTableWidget):
             delete_btn.setProperty("variant", "danger")
             delete_btn.clicked.connect(lambda checked, idx=i: self.task_delete_requested.emit(idx))
             self.setCellWidget(i, 1, delete_btn)
+        self._ignore_item_changes = False
     
     def highlight_task(self, task_index: int) -> None:
         """Implementation of ITaskDisplayWidget protocol"""
@@ -106,6 +111,13 @@ class TaskInputTable(QTableWidget):
                 self.task_delete_requested.emit(row)
         else:
             super().keyPressEvent(event)
+
+    def _on_item_changed(self, item: QTableWidgetItem):
+        if self._ignore_item_changes:
+            return
+        if item.column() != 0:
+            return
+        self.task_renamed.emit(item.row(), item.text())
 
 class TaskInputCoordinator(QWidget):
     """Single responsibility: Coordinate task input operations following SRP"""
@@ -159,6 +171,7 @@ class TaskInputCoordinator(QWidget):
     def _connect_signals(self):
         self.task_input_field.task_added.connect(self._add_task)
         self.task_table.task_delete_requested.connect(self._delete_task)
+        self.task_table.task_renamed.connect(self._rename_task)
     
     def _add_task(self, task_name: str):
         """Add a single task"""
@@ -176,6 +189,20 @@ class TaskInputCoordinator(QWidget):
             del self._tasks[task_index]
             self._update_display()
             self._update_ui_state()
+
+    def _rename_task(self, task_index: int, task_name: str):
+        """Rename a task by index"""
+        if not (0 <= task_index < len(self._tasks)):
+            return
+        clean_name = TaskValidator.sanitize_task_name(task_name)
+        if not TaskValidator.validate_task_name(clean_name):
+            QMessageBox.warning(self, "Invalid Task", "Task name cannot be empty.")
+            self._update_display()
+            return
+        if self._tasks[task_index].task == clean_name:
+            return
+        self._tasks[task_index].task = clean_name
+        self._update_display()
     
     def _import_from_clipboard(self):
         """Import tasks from clipboard"""

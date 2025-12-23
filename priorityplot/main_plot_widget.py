@@ -122,6 +122,7 @@ class PriorityPlotWidget(QWidget):
         self.plot_coordinator.task_updated.connect(self._on_task_updated)
         self.plot_coordinator.task_added.connect(self._on_task_added_from_results)
         self.plot_coordinator.task_deleted.connect(self._on_task_deleted_from_results)
+        self.plot_coordinator.task_renamed.connect(self._on_task_renamed_from_results)
     
     def _on_tasks_updated(self, tasks: List[Task]):
         """Handle task list updates from input coordinator"""
@@ -147,6 +148,12 @@ class PriorityPlotWidget(QWidget):
             self._update_all_displays()
         except ValueError as e:
             QMessageBox.warning(self, "Invalid Task", f"Could not add task:\n{str(e)}")
+
+    def _on_task_renamed_from_results(self, task_index: int, task_name: str):
+        """Handle task rename from results view"""
+        if 0 <= task_index < len(self._task_list):
+            self._task_list[task_index].task = task_name
+            self._update_all_displays()
     
     def _show_results(self):
         """Transition to results view"""
