@@ -25,6 +25,7 @@ class TaskInputField(QWidget):
         layout.addWidget(self.task_input)
         
         self.add_button = QPushButton("Add")
+        self.add_button.setProperty("variant", "primary")
         self.add_button.clicked.connect(self._on_add_clicked)
         layout.addWidget(self.add_button)
         
@@ -81,20 +82,7 @@ class TaskInputTable(QTableWidget):
             
             # Delete button
             delete_btn = QPushButton("Remove")
-            delete_btn.setStyleSheet("""
-                QPushButton {
-                    background: transparent;
-                    color: #F87171;
-                    border: 1px solid #2A2F36;
-                    border-radius: 6px;
-                    padding: 4px 8px;
-                    font-size: 12px;
-                    font-weight: 600;
-                }
-                QPushButton:hover {
-                    background: #20252C;
-                }
-            """)
+            delete_btn.setProperty("variant", "danger")
             delete_btn.clicked.connect(lambda checked, idx=i: self.task_delete_requested.emit(idx))
             self.setCellWidget(i, 1, delete_btn)
     
@@ -146,6 +134,7 @@ class TaskInputCoordinator(QWidget):
 
         # Import from clipboard
         self.import_button = QPushButton("Import from Clipboard")
+        self.import_button.setProperty("variant", "secondary")
         self.import_button.clicked.connect(self._import_from_clipboard)
         layout.addWidget(self.import_button)
         
@@ -159,6 +148,7 @@ class TaskInputCoordinator(QWidget):
         
         # Show results button
         self.show_results_button = QPushButton("Open Plot")
+        self.show_results_button.setProperty("variant", "primary")
         self.show_results_button.clicked.connect(self.show_results_requested.emit)
         layout.addWidget(self.show_results_button)
         self.show_results_button.hide()

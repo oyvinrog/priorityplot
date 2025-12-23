@@ -868,25 +868,7 @@ class DraggableTaskTable(QTableWidget):
         # Delete button
         delete_btn = QPushButton("✕")
         delete_btn.setToolTip("Remove this task")
-        delete_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #EF4444;
-                border: 1px solid #3D4451;
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #EF4444;
-                color: white;
-                border: 1px solid #EF4444;
-            }
-            QPushButton:pressed {
-                background: #DC2626;
-            }
-        """)
+        delete_btn.setProperty("variant", "danger")
         # Find original task index
         original_index = self._tasks.index(task) if task in self._tasks else -1
         delete_btn.clicked.connect(lambda checked, idx=original_index: self._on_delete_clicked(idx))
@@ -1096,37 +1078,12 @@ class ExportButtonWidget(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 10, 0, 0)
         
-        # Quick export button (primary) with enhanced styling
+        # Quick export button (primary)
         self.quick_export_button = QPushButton('📊  Export to Excel')
-        self.quick_export_button.setMinimumHeight(42)
         self.quick_export_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.quick_export_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #10B981, stop:0.5 #059669, stop:1 #047857);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 14px;
-                font-weight: bold;
-                letter-spacing: 0.5px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #34D399, stop:0.5 #10B981, stop:1 #059669);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #059669, stop:0.5 #047857, stop:1 #065F46);
-            }
-            QPushButton:disabled {
-                background: #374151;
-                color: #6B7280;
-            }
-        """)
+        self.quick_export_button.setProperty("variant", "primary")
         self.quick_export_button.clicked.connect(self._quick_export)
-        layout.addWidget(self.quick_export_button)
+        layout.addWidget(self.quick_export_button, alignment=Qt.AlignmentFlag.AlignLeft)
         
         self.setLayout(layout)
     
@@ -1229,29 +1186,8 @@ class PlotResultsCoordinator(QWidget):
         quick_add_layout.addWidget(self.quick_task_input)
 
         self.quick_add_button = QPushButton("Add")
-        self.quick_add_button.setMinimumHeight(38)
-        self.quick_add_button.setMinimumWidth(80)
         self.quick_add_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.quick_add_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #10B981, stop:1 #059669);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 8px 16px;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #34D399, stop:1 #10B981);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #059669, stop:1 #047857);
-            }
-        """)
+        self.quick_add_button.setProperty("variant", "primary")
         self.quick_add_button.clicked.connect(self._add_quick_task)
         quick_add_layout.addWidget(self.quick_add_button)
         layout.addLayout(quick_add_layout)

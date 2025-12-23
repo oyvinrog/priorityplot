@@ -73,22 +73,68 @@ def main():
         }
         
         QPushButton {
-            background: #1FAE9B;
-            color: #FFFFFF;
-            border: none;
-            padding: 8px 14px;
+            background: #1B2027;
+            color: #E5E7EB;
+            border: 1px solid #2A2F36;
+            padding: 6px 12px;
             border-radius: 6px;
-            min-width: 84px;
+            min-height: 30px;
             font-weight: 600;
             font-size: 12px;
         }
         
         QPushButton:hover {
-            background: #23C3AE;
+            background: #212833;
+            border-color: #3A4452;
         }
         
         QPushButton:pressed {
+            background: #161B22;
+        }
+        
+        QPushButton[variant="primary"] {
+            background: #1FAE9B;
+            color: #FFFFFF;
+            border-color: #1FAE9B;
+        }
+        
+        QPushButton[variant="primary"]:hover {
+            background: #23C3AE;
+            border-color: #23C3AE;
+        }
+        
+        QPushButton[variant="primary"]:pressed {
             background: #189686;
+            border-color: #189686;
+        }
+        
+        QPushButton[variant="secondary"] {
+            background: transparent;
+            color: #C9D2DD;
+            border-color: #2A2F36;
+        }
+        
+        QPushButton[variant="secondary"]:hover {
+            background: #1A2028;
+            border-color: #3A4452;
+            color: #E5E7EB;
+        }
+        
+        QPushButton[variant="danger"] {
+            background: transparent;
+            color: #FCA5A5;
+            border-color: #4B2328;
+        }
+        
+        QPushButton[variant="danger"]:hover {
+            background: #B91C1C;
+            color: #FFFFFF;
+            border-color: #B91C1C;
+        }
+        
+        QPushButton[variant="danger"]:pressed {
+            background: #991B1B;
+            border-color: #991B1B;
         }
         
         QLineEdit {
@@ -153,8 +199,8 @@ def main():
         }
         
         QMessageBox QPushButton {
-            min-width: 110px;
-            padding: 8px 16px;
+            min-width: 90px;
+            padding: 6px 12px;
         }
         
         QSplitter::handle {
