@@ -24,6 +24,7 @@ class InteractivePlotWidget(QWidget):
     task_selected = pyqtSignal(int)  # task_index
     task_drag_started = pyqtSignal(int, str)  # task index, task data for external drops
     task_delete_requested = pyqtSignal(int)  # task index to delete
+    task_move_finished = pyqtSignal(int, float, float)  # task_index, value, time
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -595,6 +596,7 @@ class InteractivePlotWidget(QWidget):
         """Clean up after drag operation"""
         # Restore cursor
         QApplication.restoreOverrideCursor()
+        finished_task = None
         
         if self.dragging and self.drag_index is not None:
             # Emit final update for internal drags
@@ -603,6 +605,7 @@ class InteractivePlotWidget(QWidget):
                 self.task_moved.emit(self.drag_index, task.value, task.time)
                 # Full redraw
                 self.update_plot(self._tasks)
+                finished_task = (self.drag_index, task.value, task.time)
         
         # Clean up visual elements
         if self.drag_preview_annotation:
@@ -631,6 +634,9 @@ class InteractivePlotWidget(QWidget):
         
         if hasattr(self, 'canvas'):
             self.canvas.draw_idle()
+
+        if finished_task is not None:
+            self.task_move_finished.emit(*finished_task)
     
     def keyPressEvent(self, event):
         """Handle keyboard events for task deletion"""
@@ -1177,6 +1183,7 @@ class PlotResultsCoordinator(QWidget):
     task_added = pyqtSignal(str)  # task_name (when new task is added)
     task_deleted = pyqtSignal(int)  # task_index (when task is deleted)
     task_renamed = pyqtSignal(int, str)  # task_index, new name
+    task_move_finished = pyqtSignal(int, float, float)  # task_index, value, time
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1264,6 +1271,7 @@ class PlotResultsCoordinator(QWidget):
         self.plot_widget.task_selected.connect(self._on_task_selected)
         self.plot_widget.task_drag_started.connect(self._on_task_drag_started)  # Connect graph drag signal
         self.plot_widget.task_delete_requested.connect(self._on_task_delete_requested)  # Connect plot delete signal
+        self.plot_widget.task_move_finished.connect(self._on_task_move_finished)
         self.results_table.task_selected.connect(self._on_task_selected)
         self.results_table.task_drag_started.connect(self._on_task_drag_started)  # Connect table drag signal
         self.results_table.task_delete_requested.connect(self._on_task_delete_requested)
@@ -1300,6 +1308,10 @@ class PlotResultsCoordinator(QWidget):
         """Handle task rename request from results table"""
         if 0 <= task_index < len(self._tasks):
             self.task_renamed.emit(task_index, task_name)
+
+    def _on_task_move_finished(self, task_index: int, value: float, time: float):
+        """Forward move completion so persistence can happen once per drag."""
+        self.task_move_finished.emit(task_index, value, time)
     
     def set_tasks(self, tasks: List[Task]):
         """Set tasks for display"""

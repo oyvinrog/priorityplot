@@ -2,9 +2,10 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QLineEdit,
                              QLabel, QTableWidget, QTableWidgetItem, QMessageBox,
                              QHeaderView, QApplication)
 from PyQt6.QtCore import Qt, pyqtSignal
-from typing import List
+from typing import List, Optional
 from .interfaces import ITaskInputWidget, ITaskDisplayWidget
 from .model import Task, SampleDataGenerator, TaskValidator
+from .goal_memory import GoalMemory
 
 class TaskInputField(QWidget):
     """Single responsibility: Handle individual task input following SRP
@@ -125,9 +126,10 @@ class TaskInputCoordinator(QWidget):
     tasks_updated = pyqtSignal(list)  # Emit when task list changes
     show_results_requested = pyqtSignal()
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, goal_memory: Optional[GoalMemory] = None):
         super().__init__(parent)
         self._tasks = []
+        self._goal_memory = goal_memory
         self._setup_ui()
         self._connect_signals()
     
@@ -176,12 +178,20 @@ class TaskInputCoordinator(QWidget):
     def _add_task(self, task_name: str):
         """Add a single task"""
         try:
-            new_task = TaskValidator.create_validated_task(task_name)
+            new_task = self._create_task_with_memory(task_name)
             self._tasks.append(new_task)
             self._update_display()
             self._update_ui_state()
         except ValueError as e:
             QMessageBox.warning(self, "Invalid Task", f"Could not create task:\n{str(e)}")
+
+    def _create_task_with_memory(self, task_name: str) -> Task:
+        if self._goal_memory is None:
+            return TaskValidator.create_validated_task(task_name)
+        match = self._goal_memory.find_match(task_name)
+        if match:
+            return TaskValidator.create_validated_task(task_name, match.value, match.time)
+        return TaskValidator.create_validated_task(task_name)
     
     def _delete_task(self, task_index: int):
         """Delete a task by index"""
@@ -213,7 +223,7 @@ class TaskInputCoordinator(QWidget):
             QMessageBox.warning(self, "Clipboard Empty", "No text found in clipboard.")
             return
         
-        new_tasks = SampleDataGenerator.create_tasks_from_text(text)
+        new_tasks = SampleDataGenerator.create_tasks_from_text(text, goal_memory=self._goal_memory)
         
         if not new_tasks:
             QMessageBox.warning(self, "No Valid Tasks", "The clipboard text doesn't contain valid tasks.")
