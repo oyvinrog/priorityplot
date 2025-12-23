@@ -20,7 +20,7 @@ class TaskInputField(QWidget):
         layout = QVBoxLayout()
         
         self.task_input = QLineEdit()
-        self.task_input.setPlaceholderText("Add a task")
+        self.task_input.setPlaceholderText("Add a task (Ctrl+V to paste in bulk)")
         self.task_input.returnPressed.connect(self._on_return_pressed)
         layout.addWidget(self.task_input)
         
@@ -218,13 +218,15 @@ class TaskInputCoordinator(QWidget):
         if len(self._tasks) >= 1:
             self.show_results_button.show()
             
-        # Update placeholder text
-        if len(self._tasks) == 1:
-            self.task_input_field.set_placeholder_text("Add another task or view the plot.")
+        # Update placeholder text (always include Ctrl+V hint)
+        if len(self._tasks) == 0:
+            self.task_input_field.set_placeholder_text("Add a task (Ctrl+V to paste in bulk)")
+        elif len(self._tasks) == 1:
+            self.task_input_field.set_placeholder_text("Add another task or view the plot (Ctrl+V to paste)")
         elif len(self._tasks) >= 3:
-            self.task_input_field.set_placeholder_text("View the plot when ready.")
+            self.task_input_field.set_placeholder_text("View the plot when ready (Ctrl+V to paste more)")
         else:
-            self.task_input_field.set_placeholder_text("Add another task.")
+            self.task_input_field.set_placeholder_text("Add another task (Ctrl+V to paste in bulk)")
     
     def get_tasks(self) -> List[Task]:
         """Get current task list"""

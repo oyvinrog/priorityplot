@@ -1,5 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QSplitter, QMessageBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QSplitter, QMessageBox, QLineEdit
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QShortcut, QKeySequence
 from typing import List
 
 from .interfaces import ITaskCoordinator, IWidgetEventHandler
@@ -81,6 +82,23 @@ class PriorityPlotWidget(QWidget):
         
         layout.addWidget(self.main_splitter)
         self.setLayout(layout)
+        
+        # Add Ctrl+V shortcut for pasting tasks from clipboard
+        self._setup_paste_shortcut()
+    
+    def _setup_paste_shortcut(self):
+        """Setup Ctrl+V shortcut to paste tasks when not in a text field"""
+        self.paste_shortcut = QShortcut(QKeySequence.StandardKey.Paste, self)
+        self.paste_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        self.paste_shortcut.activated.connect(self._handle_paste_shortcut)
+    
+    def _handle_paste_shortcut(self):
+        """Handle Ctrl+V - import tasks if not focused on a text input"""
+        from PyQt6.QtWidgets import QApplication
+        focused_widget = QApplication.focusWidget()
+        # Only import tasks if not typing in a text field
+        if not isinstance(focused_widget, QLineEdit):
+            self.input_coordinator._import_from_clipboard()
     
     def _setup_results_panel(self):
         """Setup the results panel with plot"""
