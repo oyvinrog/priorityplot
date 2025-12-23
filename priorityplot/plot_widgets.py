@@ -103,6 +103,12 @@ class InteractivePlotWidget(QWidget):
             pad=LayoutConstants.LABEL_PAD_LARGE,
             fontstyle='normal'
         )
+        self.figure.subplots_adjust(
+            left=LayoutConstants.FIG_LEFT,
+            bottom=LayoutConstants.FIG_BOTTOM,
+            right=LayoutConstants.FIG_RIGHT,
+            top=LayoutConstants.FIG_TOP
+        )
         
         # Style ticks with modern colors
         self.ax.tick_params(colors=ColorPalette.TEXT_MUTED, which='both', labelsize=SizeConstants.FONT_NORMAL)
