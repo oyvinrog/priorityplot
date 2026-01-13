@@ -139,6 +139,7 @@ class PriorityPlotWidget(QWidget):
     def _on_tasks_updated(self, tasks: List[Task]):
         """Handle task list updates from input coordinator"""
         self._task_list = tasks
+        self._task_coordinator._task_list = tasks
         self._update_all_displays()
     
     def _on_task_updated(self, task_index: int, value: float, time: float):
@@ -214,6 +215,13 @@ class PriorityPlotWidget(QWidget):
     def get_tasks(self) -> List[Task]:
         """Get current task list"""
         return self._task_coordinator.get_tasks()
+    
+    def set_tasks(self, tasks: List[Task]) -> None:
+        """Set task list (for loading from file or external sources)"""
+        self._task_list = tasks
+        self._task_coordinator._task_list = tasks
+        self.input_coordinator.set_tasks(tasks)
+        self._update_all_displays()
     
     def add_task(self, task_name: str) -> bool:
         """Add a new task"""

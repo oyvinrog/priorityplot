@@ -1,7 +1,312 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow
-from PyQt6.QtGui import QPalette, QColor, QFont, QFontDatabase
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QMenuBar, QMenu, QFileDialog, QMessageBox
+)
+from PyQt6.QtGui import QPalette, QColor, QFont, QFontDatabase, QAction, QKeySequence
+from PyQt6.QtCore import Qt
 from .plot_widget import PriorityPlotWidget
+from .file_manager import FileManager
+
+
+class PriorityPlotMainWindow(QMainWindow):
+    """Main window with File menu for save/load functionality."""
+    
+    def __init__(self):
+        super().__init__()
+        
+        # Initialize file manager
+        self.file_manager = FileManager()
+        
+        # Create the main widget
+        self.widget = PriorityPlotWidget()
+        self.setCentralWidget(self.widget)
+        
+        # Setup menu bar
+        self._setup_menu_bar()
+        
+        # Update window title
+        self._update_window_title()
+        
+        # Connect to task changes to track modifications
+        self._connect_modification_signals()
+    
+    def _setup_menu_bar(self):
+        """Create the menu bar with File menu."""
+        menu_bar = self.menuBar()
+        menu_bar.setStyleSheet("""
+            QMenuBar {
+                background-color: #0F1115;
+                color: #E5E7EB;
+                border-bottom: 1px solid #262B32;
+                padding: 4px;
+            }
+            QMenuBar::item {
+                padding: 6px 12px;
+                border-radius: 4px;
+            }
+            QMenuBar::item:selected {
+                background-color: #1B2027;
+            }
+            QMenu {
+                background-color: #171B22;
+                color: #E5E7EB;
+                border: 1px solid #262B32;
+                border-radius: 6px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 8px 24px 8px 12px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #1FAE9B;
+            }
+            QMenu::separator {
+                height: 1px;
+                background-color: #262B32;
+                margin: 4px 8px;
+            }
+        """)
+        
+        # File menu
+        file_menu = menu_bar.addMenu("&File")
+        
+        # New action
+        new_action = QAction("&New", self)
+        new_action.setShortcut(QKeySequence.StandardKey.New)
+        new_action.setStatusTip("Create a new priority plot")
+        new_action.triggered.connect(self._on_new)
+        file_menu.addAction(new_action)
+        
+        file_menu.addSeparator()
+        
+        # Open action
+        open_action = QAction("&Open...", self)
+        open_action.setShortcut(QKeySequence.StandardKey.Open)
+        open_action.setStatusTip("Open a priority plot file")
+        open_action.triggered.connect(self._on_open)
+        file_menu.addAction(open_action)
+        
+        # Recent files submenu
+        self.recent_menu = QMenu("Open &Recent", self)
+        self._update_recent_files_menu()
+        file_menu.addMenu(self.recent_menu)
+        
+        file_menu.addSeparator()
+        
+        # Save action
+        save_action = QAction("&Save", self)
+        save_action.setShortcut(QKeySequence.StandardKey.Save)
+        save_action.setStatusTip("Save the current priority plot")
+        save_action.triggered.connect(self._on_save)
+        file_menu.addAction(save_action)
+        
+        # Save As action
+        save_as_action = QAction("Save &As...", self)
+        save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        save_as_action.setStatusTip("Save the priority plot to a new file")
+        save_as_action.triggered.connect(self._on_save_as)
+        file_menu.addAction(save_as_action)
+        
+        file_menu.addSeparator()
+        
+        # Exit action
+        exit_action = QAction("E&xit", self)
+        exit_action.setShortcut(QKeySequence.StandardKey.Quit)
+        exit_action.setStatusTip("Exit the application")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+    
+    def _update_recent_files_menu(self):
+        """Update the recent files submenu."""
+        self.recent_menu.clear()
+        
+        recent_files = self.file_manager.get_recent_files()
+        
+        if not recent_files:
+            no_recent_action = QAction("No Recent Files", self)
+            no_recent_action.setEnabled(False)
+            self.recent_menu.addAction(no_recent_action)
+        else:
+            for i, rf in enumerate(recent_files):
+                file_path = rf.get("path", "")
+                file_name = rf.get("name", "Unknown")
+                action = QAction(f"&{i + 1}. {file_name}", self)
+                action.setStatusTip(file_path)
+                action.setData(file_path)
+                action.triggered.connect(lambda checked, path=file_path: self._open_file(path))
+                self.recent_menu.addAction(action)
+            
+            self.recent_menu.addSeparator()
+            
+            clear_action = QAction("Clear Recent Files", self)
+            clear_action.triggered.connect(self._clear_recent_files)
+            self.recent_menu.addAction(clear_action)
+    
+    def _update_window_title(self):
+        """Update the window title based on current file state."""
+        title = "Priority Plot  •  Task Prioritization Made Simple"
+        file_name = self.file_manager.current_file_name
+        
+        if self.file_manager.is_modified:
+            title = f"• {file_name} - {title}"
+        elif self.file_manager.current_file:
+            title = f"{file_name} - {title}"
+        
+        self.setWindowTitle(title)
+    
+    def _connect_modification_signals(self):
+        """Connect signals to track when tasks are modified."""
+        # Connect to the input coordinator's tasks_updated signal
+        self.widget.input_coordinator.tasks_updated.connect(self._on_tasks_modified)
+        # Connect to the plot coordinator's task_updated signal
+        self.widget.plot_coordinator.task_updated.connect(self._on_tasks_modified)
+        self.widget.plot_coordinator.task_added.connect(self._on_tasks_modified)
+        self.widget.plot_coordinator.task_deleted.connect(self._on_tasks_modified)
+        self.widget.plot_coordinator.task_renamed.connect(self._on_tasks_modified)
+    
+    def _on_tasks_modified(self, *args):
+        """Handle task modifications."""
+        self.file_manager.set_modified(True)
+        self._update_window_title()
+    
+    def _on_new(self):
+        """Create a new priority plot."""
+        if not self._check_save_changes():
+            return
+        
+        # Reset the widget with empty task list using the public API
+        self.widget.set_tasks([])
+        self.widget.results_panel.hide()
+        self.widget.input_coordinator.show()
+        
+        self.file_manager.new_file()
+        self._update_window_title()
+    
+    def _on_open(self):
+        """Open a priority plot file."""
+        if not self._check_save_changes():
+            return
+        
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Priority Plot",
+            self.file_manager.get_default_save_directory(),
+            self.file_manager.FILE_FILTER
+        )
+        
+        if file_path:
+            self._open_file(file_path)
+    
+    def _open_file(self, file_path: str):
+        """Open a specific file."""
+        if not self._check_save_changes():
+            return
+        
+        success, message, tasks = self.file_manager.load(file_path)
+        
+        if success:
+            # Update the widget with loaded tasks using the public API
+            self.widget.set_tasks(tasks)
+            
+            # Show results if there are tasks
+            if tasks:
+                self.widget._show_results()
+            else:
+                self.widget.results_panel.hide()
+                self.widget.input_coordinator.show()
+            
+            self._update_recent_files_menu()
+            self._update_window_title()
+        else:
+            QMessageBox.warning(self, "Open Failed", message)
+    
+    def _on_save(self):
+        """Save the current priority plot."""
+        if self.file_manager.current_file:
+            self._save_to_file(self.file_manager.current_file)
+        else:
+            self._on_save_as()
+    
+    def _on_save_as(self):
+        """Save the priority plot to a new file."""
+        default_name = self.file_manager.current_file_name
+        if default_name == "Untitled":
+            default_name = "my_priorities.priplot"
+        elif not default_name.endswith(".priplot"):
+            default_name += ".priplot"
+        
+        default_path = os.path.join(
+            self.file_manager.get_default_save_directory(),
+            default_name
+        )
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Priority Plot",
+            default_path,
+            self.file_manager.FILE_FILTER
+        )
+        
+        if file_path:
+            self._save_to_file(file_path)
+    
+    def _save_to_file(self, file_path: str):
+        """Save to a specific file."""
+        tasks = self.widget.get_tasks()
+        success, message = self.file_manager.save(tasks, file_path)
+        
+        if success:
+            self._update_recent_files_menu()
+            self._update_window_title()
+        else:
+            QMessageBox.warning(self, "Save Failed", message)
+    
+    def _clear_recent_files(self):
+        """Clear the recent files list."""
+        self.file_manager.clear_recent_files()
+        self._update_recent_files_menu()
+    
+    def _check_save_changes(self) -> bool:
+        """
+        Check if there are unsaved changes and prompt to save.
+        Returns True if the operation should continue, False if cancelled.
+        """
+        if not self.file_manager.is_modified:
+            return True
+        
+        # Check if there are any tasks
+        tasks = self.widget.get_tasks()
+        if not tasks:
+            return True
+        
+        reply = QMessageBox.question(
+            self,
+            "Unsaved Changes",
+            "Do you want to save your changes before continuing?",
+            QMessageBox.StandardButton.Save | 
+            QMessageBox.StandardButton.Discard | 
+            QMessageBox.StandardButton.Cancel
+        )
+        
+        if reply == QMessageBox.StandardButton.Save:
+            self._on_save()
+            return not self.file_manager.is_modified  # True if save succeeded
+        elif reply == QMessageBox.StandardButton.Discard:
+            return True
+        else:  # Cancel
+            return False
+    
+    def closeEvent(self, event):
+        """Handle window close event."""
+        if self._check_save_changes():
+            event.accept()
+        else:
+            event.ignore()
+
+
+# Need os for file paths
+import os
 
 def main():
     app = QApplication(sys.argv)
@@ -232,10 +537,7 @@ def main():
         }
     """)
     
-    main_window = QMainWindow()
-    widget = PriorityPlotWidget()
-    main_window.setCentralWidget(widget)
-    main_window.setWindowTitle('Priority Plot  •  Task Prioritization Made Simple')
+    main_window = PriorityPlotMainWindow()
     
     # Make window scalable and responsive to different screen sizes
     # Get screen geometry to set appropriate default size
